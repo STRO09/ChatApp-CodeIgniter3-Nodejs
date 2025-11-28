@@ -104,7 +104,6 @@
     // Get username from PHP
     const myRealUsername = <?php echo json_encode($username); ?>;
     const myRealId = <?php echo json_encode($userId); ?>;
-
     let myUserData = {
         id: myRealId,
         username: myRealUsername,
@@ -212,84 +211,77 @@
             }
         });
     }
-            console.log("My Id: "+myUserData.id);
-
+    console.log("My Id: " + myUserData.id);
     // Select a user to chat with
     function selectUser(user, type) {
-        // Remove active class from all chat items
         document.querySelectorAll('.chat-item').forEach(item => {
             item.classList.remove('active');
         });
-        // Add active class to selected chat
         event.currentTarget.classList.add('active');
-        // Set current user and room
         currentUser = user;
-
-        console.log("My Id: "+myUserData.id+ ", Selected user Id:" + user.userId);
-        // --- NEW ROOM LOGIC: ask backend for conversation ---
+        console.log("My Id: " + myUserData.id + ", Selected user Id:" + user.userId);
         fetch("http://10.10.15.140:5555/api/conversations", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                userId1: myUserData.id, // your logged‑in user id
-                userId2: user.userId // the clicked user id
+                userId1: myUserData.id,
+                userId2: user.userId
             })
         }).then(res => res.json()).then(data => {
             const {
-                conversation,
-                messages
+                conversation
             } = data;
-            currentRoom = conversation.roomName; // use backend roomName
-            // Update chat header
+            currentRoom = conversation.roomName;
             const displayName = user.name || user.username;
             currentChatTitle.textContent = displayName;
-            currentChatStatus.textContent = type === 'online' ? 'Online - Active now' : 'Offline';
-            currentChatStatus.style.color = type === 'online' ? '#4caf50' : '#757575';
-            // Update avatar
-            const avatarId = user.id || (user.socketId ? user.socketId.substring(0, 8) : 'default');
+            currentChatStatus.textContent = type === "online" ? "Online - Active now" : "Offline";
+            currentChatStatus.style.color = type === "online" ? "#4caf50" : "#757575";
+            const avatarId = user.id || (user.socketId ? user.socketId.substring(0, 8) : "default");
             currentUserAvatar.src = `https://i.pravatar.cc/150?u=${avatarId}`;
-            currentUserStatus.className = `status-indicator ${type === 'online' ? 'online' : 'offline'}`;
-            // Join the room for this chat
-            socket.emit('joinRoom', {
+            currentUserStatus.className = `status-indicator ${
+        type === "online" ? "online" : "offline"
+      }`;
+            socket.emit("joinRoom", {
                 roomName: currentRoom,
                 username: myUserData.username,
-                id: myUserData.id  
+                id: myUserData.id
             });
             console.log(`Joined room: ${currentRoom} with user: ${displayName}`);
-            // Enable input and send button
             messageInput.disabled = false;
             sendButton.disabled = false;
             messageInput.focus();
-            // Load chat history from backend messages
-            chatMessages.innerHTML = '';
+            // Use loadChatHistory for consistency
+            loadChatHistory(conversation._id, displayName);
+        }).catch(err => {
+            console.error("Error fetching conversation/messages:", err);
+        });
+    }
+
+    function loadChatHistory(conversationId, userName) {
+        chatMessages.innerHTML = "";
+        const welcomeMessage = document.createElement("div");
+        welcomeMessage.className = "message received";
+        welcomeMessage.innerHTML = `
+    <div class="message-text">You are now chatting with <strong>${userName}</strong>. Start the conversation!</div>
+    <div class="message-time">Just now</div>
+  `;
+        chatMessages.appendChild(welcomeMessage);
+        fetch(`http://10.10.15.140:5555/api/messages/${conversationId}`).then(res => res.json()).then(messages => {
             messages.forEach(msg => {
-                const messageElement = document.createElement('div');
-                messageElement.className = msg.sender === myUserData.id ? 'message sent' : 'message received';
+                // normalize sender id check
+                const senderId = typeof msg.sender === "object" ? msg.sender._id : msg.sender;
+                const messageElement = document.createElement("div");
+                messageElement.className = senderId === myUserData.id ? "message sent" : "message received";
                 messageElement.innerHTML = `
-        <div class="message-text">${msg.text}</div>
-        <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString()}</div>
+          <div class="message-text">${msg.text}</div>
+          <div class="message-time">${new Date(msg.createdAt).toLocaleTimeString()}</div>
         `;
                 chatMessages.appendChild(messageElement);
             });
             chatMessages.scrollTop = chatMessages.scrollHeight;
-        }).catch(err => {
-            console.error("Error fetching/creating conversation:", err);
-        });
-    }
-    // Load chat messages
-    function loadChatHistory(roomId, userName) {
-        chatMessages.innerHTML = '';
-        const welcomeMessage = document.createElement('div');
-        welcomeMessage.className = 'message received';
-        welcomeMessage.innerHTML = `
-        <div class="message-text">You are now chatting with <strong>${userName}</strong>. Start the conversation!</div>
-        <div class="message-time">Just now</div>
-        `;
-        chatMessages.appendChild(welcomeMessage);
-        // Scroll to bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        }).catch(err => console.error("Error loading chat history:", err));
     }
     // Send message
     function sendMessage() {
@@ -299,6 +291,7 @@
             // Emit message to server
             socket.emit('chatRoom', {
                 room: currentRoom,
+                senderId: myUserData.id,
                 name: myUserData.username,
                 message: message
             });
@@ -348,13 +341,13 @@
     function receiveMessage(data) {
         console.log('Received message:', data);
         // Only show message if it's for the current room and not from current user
-        if(data.room === currentRoom && data.socketId !== mySocketId) {
+        if(data.room === currentRoom && data.senderId !== myUserData.id) {
             const messageElement = document.createElement('div');
-            messageElement.className = 'message received';
+            messageElement.className = data.senderId === myUserData.id ? 'message sent' : 'message received';
             messageElement.innerHTML = `
-        <div class="message-text">${data.message}</div>
-        <div class="message-time">${getCurrentTime()}</div>
-        `;
+      <div class="message-text">${data.message}</div>
+      <div class="message-time">${new Date(data.timestamp).toLocaleTimeString()}</div>
+    `;
             chatMessages.appendChild(messageElement);
             chatMessages.scrollTop = chatMessages.scrollHeight;
             // Remove typing indicator
@@ -403,7 +396,7 @@
         socket.emit('joinRoom', {
             roomName: 'general',
             username: myUserData.username,
-            id: myUserData.id  
+            id: myUserData.id
         });
     });
     socket.on('userListUpdate', (users) => {
