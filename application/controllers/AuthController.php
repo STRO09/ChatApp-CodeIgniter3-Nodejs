@@ -33,8 +33,9 @@ class AuthController extends CI_Controller
             // Validation failed → reload form with errors
             $this->load->view("Register");
         } else {
+            $serverorigin = $this->config->item('server_origin');
             // Validation passed → save user
-            $url = "http://10.10.15.140:5555/api/register";
+            $url = $serverorigin . "/api/register";
             $data = [
                 "username" => $this->input->post("uname"),
                 "password" => $this->input->post("password"),
@@ -42,6 +43,14 @@ class AuthController extends CI_Controller
 
             // Send JSON to Node backend
             $response = $this->curl_library->simple_post($url, $data);
+
+
+            if ($response === false || empty($response)) {
+                $data["error"] = "Auth server unreachable";
+                $this->load->view("Register", $data);
+                return;
+            }
+
             $res = json_decode($response, true); // decode JSON into array
 
             if (isset($res["error"])) {
@@ -50,6 +59,11 @@ class AuthController extends CI_Controller
                 $this->load->view("Register", $data);
                 return;
             }
+
+            $this->session->set_flashdata(
+                'toast_success',
+                'Registration successful. Please login.'
+            );
             // echo $response;
             redirect("AuthController", "refresh");
         }
@@ -57,13 +71,20 @@ class AuthController extends CI_Controller
 
     public function loginUser()
     {
-        $url = "http://10.10.15.140:5555/api/login";
+        $serverorigin = $this->config->item('server_origin');
+        $url = $serverorigin . "/api/login";
         $data = [
             "username" => $this->input->post("uname"),
             "password" => $this->input->post("password"),
         ];
 
         $response = $this->curl_library->simple_post($url, $data);
+
+        if ($response === false || empty($response)) {
+            $data["error"] = "Auth server unreachable";
+            $this->load->view("Login", $data);
+            return;
+        }
 
         $res = json_decode($response, true); // decode as array
 
@@ -78,10 +99,10 @@ class AuthController extends CI_Controller
             $token = $res["token"];
             $payload = decode_jwt($token);
 
-        if ($payload && isset($payload["username"])) {
-            $this->session->set_userdata("username", $payload["username"]);
-            $this->session->set_userdata("userId", $payload["id"]);
-        }
+            if ($payload && isset($payload["username"])) {
+                $this->session->set_userdata("username", $payload["username"]);
+                $this->session->set_userdata("userId", $payload["id"]);
+            }
 
 
             set_cookie([
@@ -101,7 +122,8 @@ class AuthController extends CI_Controller
     }
 
 
-    public function Logout() {
+    public function Logout()
+    {
         $this->session->unset_userdata('username');
         $this->session->sess_destroy();
 
@@ -109,7 +131,7 @@ class AuthController extends CI_Controller
         delete_cookie('jwt_token');
 
         // Redirect to login page
-        $this -> load -> view('Login');
+        $this->load->view('Login');
     }
 }
 /* End of file AuthController.php */
