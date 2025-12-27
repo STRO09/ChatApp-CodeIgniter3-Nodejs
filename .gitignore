@@ -1,2 +1,4 @@
 .phpintel/
 uploads/
+.env
+node_modules

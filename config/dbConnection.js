@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
-
+import "dotenv/config";
 const connectDB = async () => {
   try {
  await mongoose.connect(
-  "mongodb+srv://chatapp2:slash123@cluster0.q9veugy.mongodb.net/chatapp?retryWrites=true&w=majority",
+  process.env.MONGODB_URI,
   {
     useNewUrlParser: true,
     useUnifiedTopology: true
