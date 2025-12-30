@@ -24,7 +24,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Middleware
 app.use(cors({
-  origin: ["http://localhost", "http://127.0.0.1", "http://10.10.15.140"],
+  origin: ["http://localhost", "http://127.0.0.1", "http://10.10.15.140", 'http://[::1]'],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
