@@ -64,11 +64,12 @@ export const initSocket = (server) => {
             createdAt: new Date()
           };
 
-          io.to(data.room).emit('chatRoom', messageData);
+          if(!Conversation.isGroup)  io.to(data.room).emit('chatRoom', messageData);
           
           // Also emit to all participants individually to ensure they get the notification
           // This ensures users not in the room still get real-time updates
-          conversation.participants.forEach(participant => {
+          if(conversation.isGroup) {
+            conversation.participants.forEach(participant => {
             if (participant._id.toString() !== data.senderId.toString()) {
               const userSocket = Array.from(connectedUsers.values()).find(
                 u => u.userId === participant._id.toString()
@@ -83,6 +84,7 @@ export const initSocket = (server) => {
               }
             }
           });
+          }
         }
       } catch (err) {
         console.error("Error in chatRoom socket event:", err);
