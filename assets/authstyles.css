@@ -162,24 +162,144 @@ h2 {
 
 .toast {
   position: fixed;
-  top: 20px;
-  left: 38%;
-  background: #222;
-  color: #fff;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 14px 18px;
-  border-radius: 6px;
+  min-width: 250px;
+  border-radius: 8px;
   font-size: 14px;
+  font-weight: 500;
+  background: #2a2a2a;
+  color: #fff;
   opacity: 0;
   transform: translateY(-10px);
-  transition: all 0.3s ease;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+  pointer-events: none;
   z-index: 9999;
-}
-
-.toast.success {
-  background: #2e7d32;
+  transition:
+    opacity .35s ease,
+    transform .35s cubic-bezier(.22,.61,.36,1),
+    box-shadow .3s ease;
 }
 
 .toast.show {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
+}
+
+.toast.success {
+  border-left: 4px solid #2ecc71;
+  background: #1e2f23;
+}
+
+.toast.error {
+  border-left: 4px solid #e74c3c;
+  background: #2b1e1e;
+}
+
+.toast.warning {
+  border-left: 4px solid #f1c40f;
+  background: #2e2a1e;
+}
+
+.toast + .toast {
+  margin-top: 12px;
+}
+
+.error {
+color: red;
+}
+
+.password-strength {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.strength-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 6px;
+  background: #d8d8d8;
+  overflow: hidden;
+}
+
+.strength-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #333;
+  align-items: center;
+}
+
+.strength-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: #d9d9d9;
+  overflow: hidden;
+}
+
+#strengthFill {
+  height: 100%;
+  width: 0%;
+  transition: width .3s ease;
+}
+
+#strengthFill.weak { width: 25%; background: #e74c3c; }
+#strengthFill.fair { width: 50%; background: #f1c40f; }
+#strengthFill.good { width: 75%; background: #3498db; }
+#strengthFill.strong { width: 100%; background: #2ecc71; }
+
+.strength-mini {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  flex-wrap: wrap;
+  color: #777;
+}
+
+.strength-mini span.met {
+  color: #2ecc71;
+  font-weight: 500;
+}
+
+.tooltip-trigger {
+  font-size: 11px;
+  background: #ddd;
+  color: #333;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.tooltip-box {
+  position: absolute;
+  margin-top: 4px;
+  background: #1f1f1f;
+  color: #fff;
+  font-size: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  display: none;
+  z-index: 999;
+}
+
+.tooltip-box ul {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+}
+
+.tooltip-box li {
+  margin-bottom: 3px;
 }
