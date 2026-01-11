@@ -41,11 +41,6 @@ app.use('/api', userRoutes);
 app.use('/api', conversationRoutes);
 app.use('/api', messageRoutes);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date() });
-});
-
 // Create HTTP server
 const server = createServer(app);
 
