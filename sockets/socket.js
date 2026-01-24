@@ -3,6 +3,10 @@ import Conversation from '../models/Conversations.js';
 
 // Store connected users with userId as key
 const connectedUsers = new Map();
+
+// Track which users are actively viewing which conversations
+const activeConversations = new Map(); // Map<userId, conversationId>
+
 let io;
 
 export const initSocket = (server) => {
@@ -36,68 +40,77 @@ export const initSocket = (server) => {
       console.log(`${username} authenticated (ID: ${userId})`);
     });
 
-    // Handle joining a room
+    // Handle joining a room - UPDATED to track active conversations
     socket.on('joinRoom', (data) => {
-      const { roomName, username, id: userId } = data;
+      const { roomName, username, id: userId, conversationId } = data;
       
       if (roomName) {
         socket.join(roomName);
+        
+        // Track that this user is actively viewing this conversation
+        if (conversationId) {
+          activeConversations.set(userId, conversationId);
+          console.log(`${username} is now actively viewing conversation ${conversationId}`);
+        }
+        
         console.log(`${username} joined room ${roomName}`);
       }
     });
 
-    // Handle chat messages - UPDATED to include conversationId
-    socket.on("chatRoom", async (data) => {
-      console.log("Socket received message:", data);
+    // NEW: Handle leaving a conversation (when user navigates away)
+    socket.on('leaveConversation', (data) => {
+      const { userId, conversationId } = data;
       
-      // Get conversation to find all participants
+      if (activeConversations.get(userId) === conversationId) {
+        activeConversations.delete(userId);
+        console.log(`User ${userId} is no longer viewing conversation ${conversationId}`);
+      }
+    });
+
+    // Handle chat messages - FIXED to prevent duplicates
+    socket.on("chatRoom", async (data) => {
       try {
         const conversation = await Conversation.findById(data.conversationId)
-          .populate('participants', '_id');
+          .populate('participants', '_id username');
         
-        if (conversation) {
-          // Emit to room (for users currently in the chat)
-          const messageData = {
-            room: data.room,
-            senderId: data.senderId,
-            message: data.message,
-            createdAt: new Date()
-          };
-
-          if(!Conversation.isGroup)  io.to(data.room).emit('chatRoom', messageData);
-          
-          // Also emit to all participants individually to ensure they get the notification
-          // This ensures users not in the room still get real-time updates
-          if(conversation.isGroup) {
-            conversation.participants.forEach(participant => {
-            if (participant._id.toString() !== data.senderId.toString()) {
-              const userSocket = Array.from(connectedUsers.values()).find(
-                u => u.userId === participant._id.toString()
-              );
-              
-              if (userSocket) {
-                io.to(userSocket.socketId).emit('chatRoom', {
-                  ...messageData,
-                  // Add conversationId to help frontend identify which conversation
-                  conversationId: data.conversationId
-                });
-              }
-            }
-          });
-          }
+        if (!conversation) {
+          console.error("Conversation not found:", data.conversationId);
+          return;
         }
-      } catch (err) {
-        console.error("Error in chatRoom socket event:", err);
-        
-        // Fallback: just emit to the room
+
         const messageData = {
           room: data.room,
           senderId: data.senderId,
           message: data.message,
+          conversationId: data.conversationId,
           createdAt: new Date()
         };
-        
-        io.to(data.room).emit('chatRoom', messageData);
+
+        console.log(`Message in conversation ${data.conversationId} from ${data.senderId}`);
+
+        // Send message to all participants individually (except sender)
+        conversation.participants.forEach(participant => {
+          if (participant._id.toString() !== data.senderId.toString()) {
+            const userSocket = Array.from(connectedUsers.values()).find(
+              u => u.userId === participant._id.toString()
+            );
+            
+            if (userSocket) {
+              // Check if this user is actively viewing this conversation
+              const isActivelyViewing = activeConversations.get(participant._id.toString()) === data.conversationId;
+              
+              console.log(`Participant ${participant.username}: Online=${true}, ActivelyViewing=${isActivelyViewing}`);
+              
+              // Send to this participant's socket
+              io.to(userSocket.socketId).emit('chatRoom', messageData);
+            } else {
+              console.log(`Participant ${participant.username}: Offline`);
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error("Error in chatRoom socket event:", err);
       }
     });
 
@@ -128,6 +141,10 @@ export const initSocket = (server) => {
         if (user.socketId === socket.id) {
           disconnectedUser = user;
           connectedUsers.delete(userId);
+          
+          // Remove from active conversations
+          activeConversations.delete(userId);
+          
           break;
         }
       }
@@ -148,6 +165,7 @@ export const initSocket = (server) => {
         const user = connectedUsers.get(userId);
         console.log(`${user.username} logged out`);
         connectedUsers.delete(userId);
+        activeConversations.delete(userId);
         io.emit('userListUpdate', Array.from(connectedUsers.values()));
       }
     });
@@ -167,4 +185,8 @@ export const getConnectedUsers = () => {
 
 export const isUserOnline = (userId) => {
   return connectedUsers.has(userId);
+};
+
+export const getActiveConversations = () => {
+  return new Map(activeConversations);
 };

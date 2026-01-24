@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser ,getAllUsersForChat,getAllUsers,updateUserStatus, updateUserProfile, getUserById} from '../controllers/userController.js';
+import { registerUser, loginUser ,getAllUsersForChat,getAllUsers,updateUserStatus, updateUserProfile, getUserById, forgotPassword, resetPassword, verifyResetToken} from '../controllers/userController.js';
 
 const router = express.Router();
 
@@ -11,5 +11,10 @@ router.get('/users/all/:userId', getAllUsers);
 router.put('/user/:userId/status', updateUserStatus);
 router.post('/user/update-profile', updateUserProfile);
 router.get("/user/:userId", getUserById);
+
+// Password reset routes
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.get('/verify-reset-token/:token', verifyResetToken);
 
 export default router;
