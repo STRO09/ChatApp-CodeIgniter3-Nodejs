@@ -17,6 +17,12 @@
     </div>
   <?php endif; ?>
 
+  <?php if ($this->session->flashdata('toast_error')): ?>
+    <div id="toast" class="toast error">
+      <?= $this->session->flashdata('toast_error') ?>
+    </div>
+  <?php endif; ?>
+
   <div>
     <form class="form" method="post" action="<?= site_url('AuthController/loginUser') ?>" id="loginForm">
       <div class="flex-column">
@@ -30,9 +36,9 @@
         </div>
       <?php endif; ?>
 
-      <!-- Username Field -->
+      <!-- Username/Email Field -->
       <div class="flex-column">
-        <label for="uname">Username</label>
+        <label for="uname">Username or Email</label>
       </div>
       <div class="inputForm" id="usernameInput">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="0 0 32 32" height="20">
@@ -42,11 +48,10 @@
             </path>
           </g>
         </svg>
-        <input placeholder="Enter your username" class="input" type="text" name="uname" id="uname"
+        <input placeholder="Enter your username or email" class="input" type="text" name="uname" id="uname"
           autocomplete="username" required>
       </div>
       <div id="usernameValidation"></div>
-
 
       <!-- Password Field -->
       <div class="flex-column">
@@ -78,7 +83,7 @@
       </div>
 
       <div class="flex-row">
-        <span class="span">Forgot password?</span>
+        <a href="<?= site_url('AuthController/forgotPassword') ?>" class="span" style="cursor: pointer;">Forgot password?</a>
       </div>
 
       <button class="button-submit" type="submit">

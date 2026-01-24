@@ -8,11 +8,13 @@
 // -------------------------------
 const validationState = {
 	username: false,
+	email: false,
 	password: false,
 	confirmPassword: false,
 };
 
 const loginForm = document.getElementById("loginForm");
+const registerForm = document.getElementById("registerForm");
 
 // -------------------------------
 // Username Validation
@@ -23,7 +25,7 @@ function validateUsername(username) {
 
 	if (!username) {
 		usernameInput.classList.remove("error", "success");
-		validationDiv.innerHTML = "";
+		if (validationDiv) validationDiv.innerHTML = "";
 		validationState.username = false;
 		return false;
 	}
@@ -39,7 +41,7 @@ function validateUsername(username) {
 	if (errors.length > 0) {
 		usernameInput.classList.add("error");
 		usernameInput.classList.remove("success");
-		if (!loginForm)
+		if (!loginForm && validationDiv)
 			validationDiv.innerHTML = errors
 				.map((e) => `<div class="validation-msg error">⚠ ${e}</div>`)
 				.join("");
@@ -49,9 +51,46 @@ function validateUsername(username) {
 
 	usernameInput.classList.remove("error");
 	usernameInput.classList.add("success");
-	if (!loginForm)
+	if (!loginForm && validationDiv)
 		validationDiv.innerHTML = `<div class="validation-msg success">✓ Valid username</div>`;
 	validationState.username = true;
+	return true;
+}
+
+// -------------------------------
+// Email Validation
+// -------------------------------
+function validateEmail(email) {
+	const emailInput = document.getElementById("emailInput");
+	const validationDiv = document.getElementById("emailValidation");
+
+	if (!email) {
+		if (emailInput) emailInput.classList.remove("error", "success");
+		if (validationDiv) validationDiv.innerHTML = "";
+		validationState.email = false;
+		return false;
+	}
+
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	
+	if (!emailRegex.test(email)) {
+		if (emailInput) {
+			emailInput.classList.add("error");
+			emailInput.classList.remove("success");
+		}
+		if (validationDiv)
+			validationDiv.innerHTML = `<div class="validation-msg error">⚠ Invalid email format</div>`;
+		validationState.email = false;
+		return false;
+	}
+
+	if (emailInput) {
+		emailInput.classList.remove("error");
+		emailInput.classList.add("success");
+	}
+	if (validationDiv)
+		validationDiv.innerHTML = `<div class="validation-msg success">✓ Valid email</div>`;
+	validationState.email = true;
 	return true;
 }
 
@@ -106,7 +145,7 @@ function updatePasswordStrength(password) {
 }
 
 // -------------------------------
-// Confirm Password (Register Only)
+// Confirm Password (Register/Reset Only)
 // -------------------------------
 function validatePasswordConfirmation() {
 	const pass = document.getElementById("password");
@@ -141,8 +180,8 @@ function togglePassword(fieldId) {
 	const open = field.parentElement.querySelector(".eye-open");
 
 	field.type = field.type === "password" ? "text" : "password";
-	closed.style.display = field.type === "password" ? "block" : "none";
-	open.style.display = field.type === "password" ? "none" : "block";
+	if (closed) closed.style.display = field.type === "password" ? "block" : "none";
+	if (open) open.style.display = field.type === "password" ? "none" : "block";
 }
 
 // -------------------------------
@@ -150,24 +189,29 @@ function togglePassword(fieldId) {
 // -------------------------------
 document.addEventListener("DOMContentLoaded", () => {
 	const uname = document.getElementById("uname");
+	const email = document.getElementById("email");
 	const pass = document.getElementById("password");
 	const cpass = document.getElementById("cpassword");
-	const registerForm = document.getElementById("registerForm");
+	const resetPasswordForm = document.getElementById("resetPasswordForm");
 
-	// Username events (shared)
+	// Username events (shared - login & register)
 	if (uname) {
 		uname.addEventListener("input", (e) => validateUsername(e.target.value));
 		uname.addEventListener("keypress", (e) => {
 			if (!/^[a-zA-Z0-9]$/.test(e.key)) {
 				e.preventDefault();
-				document.getElementById("usernameInput").classList.add("error");
-				setTimeout(
-					() =>
-						document.getElementById("usernameInput").classList.remove("error"),
-					300
-				);
+				const usernameInput = document.getElementById("usernameInput");
+				if (usernameInput) {
+					usernameInput.classList.add("error");
+					setTimeout(() => usernameInput.classList.remove("error"), 300);
+				}
 			}
 		});
+	}
+
+	// Email events (register only)
+	if (email && registerForm) {
+		email.addEventListener("input", (e) => validateEmail(e.target.value));
 	}
 
 	// Register password events
@@ -178,8 +222,16 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 	}
 
+	// Reset password events
+	if (pass && resetPasswordForm) {
+		pass.addEventListener("input", (e) => {
+			updatePasswordStrength(e.target.value);
+			validatePasswordConfirmation();
+		});
+	}
+
 	// Confirm password events
-	if (cpass && registerForm) {
+	if (cpass && (registerForm || resetPasswordForm)) {
 		cpass.addEventListener("input", validatePasswordConfirmation);
 	}
 
@@ -188,15 +240,17 @@ document.addEventListener("DOMContentLoaded", () => {
 		registerForm.addEventListener("submit", (e) => {
 			const strength = updatePasswordStrength(pass.value);
 			const validUser = validateUsername(uname.value);
+			const validEmail = validateEmail(email.value);
 
 			if (
 				!validUser ||
+				!validEmail ||
 				!strength ||
 				!(strength === "good" || strength === "strong") ||
 				!validationState.confirmPassword
 			) {
 				e.preventDefault();
-				showToast("Fix errors before creating account", "error");
+				showToast("Please fix all errors before creating account", "error");
 				return;
 			}
 
@@ -204,14 +258,32 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 	}
 
+	// Reset password submit
+	if (resetPasswordForm) {
+		resetPasswordForm.addEventListener("submit", (e) => {
+			const strength = updatePasswordStrength(pass.value);
+
+			if (
+				!strength ||
+				!(strength === "good" || strength === "strong") ||
+				!validationState.confirmPassword
+			) {
+				e.preventDefault();
+				showToast("Please fix all errors before resetting password", "error");
+				return;
+			}
+
+			lockButton("submitBtn", "Resetting Password...");
+		});
+	}
+
 	// Login submit (minimal validation)
 	if (loginForm) {
 		loginForm.addEventListener("submit", (e) => {
-			const validUser = validateUsername(uname.value);
-
-			if (!validUser) {
+			// For login, username can be email too, so we don't validate strictly
+			if (!uname.value.trim()) {
 				e.preventDefault();
-				showToast("Invalid username or password", "error");
+				showToast("Username or email cannot be empty", "error");
 				return;
 			}
 
@@ -238,11 +310,12 @@ document.addEventListener("DOMContentLoaded", () => {
 function lockButton(id, text, form = null) {
 	const btn = id
 		? document.getElementById(id)
-		: form.querySelector(".button-submit");
+		: form ? form.querySelector(".button-submit") : null;
 	if (!btn) return;
 	btn.disabled = true;
 	btn.classList.add("loading");
-	btn.querySelector("span").textContent = text;
+	const span = btn.querySelector("span");
+	if (span) span.textContent = text;
 }
 
 function showToast(message, type = "error", duration = 3000) {

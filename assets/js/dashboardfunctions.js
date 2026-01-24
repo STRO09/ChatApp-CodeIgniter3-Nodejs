@@ -258,6 +258,11 @@ function setupSocketListeners() {
 	socket.on("chatRoom", handleIncomingMessage);
 	socket.on("userTyping", handleUserTyping);
 	socket.on("connect_error", handleConnectionError);
+
+	socket.on("disconnect", () => {
+		console.log("Disconnected from socket");
+		userProfileElements.myStatus.className = "user-status offline";
+	});
 }
 
 function handleSocketConnect() {
@@ -280,42 +285,97 @@ function handleUserListUpdate(users) {
 	updateUserStatusInLists(); 
 }
 
-function handleIncomingMessage(data) {
-	console.log("New message received via socket");
+// SOCKET EVENT LISTENERS - UPDATED handleIncomingMessage function
+// Replace this function in your chat.js file
+
+async function handleIncomingMessage(data) {
+	console.log("New message received via socket:", data);
+
+	// CRITICAL: Check if this is our own message (shouldn't happen but just in case)
+	if (data.senderId === myUserData.id) {
+		console.log("Ignoring own message from socket");
+		return;
+	}
 
 	// Check if this message is for the current conversation
 	if (
 		currentConversation &&
 		currentConversation._id === data.message.conversationId
 	) {
-		// Message is for current conversation
-		if (data.senderId !== myUserData.id) {
-			displayMessage(data.message, false, data.message.isGroup || false);
-			chatElements.chatMessages.scrollTop =
-				chatElements.chatMessages.scrollHeight;
+		// Message is for current conversation - display it
+		displayMessage(data.message, false, data.message.isGroup || false);
+		chatElements.chatMessages.scrollTop =
+			chatElements.chatMessages.scrollHeight;
 
-			// Update conversation in sidebar
-			updateConversationLastMessage(currentConversation._id, data.message);
+		// Update conversation in sidebar
+		updateConversationLastMessage(currentConversation._id, data.message);
 
-			// Mark as read automatically since we're viewing it
-			markConversationAsRead(currentConversation._id);
-		}
+		// Mark as read automatically since we're viewing it
+		markConversationAsRead(currentConversation._id);
 	} else {
 		// Message is for another conversation
-		if (data.senderId !== myUserData.id) {
-			const conversationId = data.message.conversationId;
+		const conversationId = data.message.conversationId;
 
+		// Check if this conversation exists in our list
+		const existingConv = allConversations.find(
+			conv => conv._id === conversationId
+		);
+
+		if (!existingConv) {
+			// New conversation - reload conversations to get it
+			console.log("New conversation detected, reloading...");
+			await loadConversations();
+		} else {
 			// Update unread count
 			incrementUnreadCount(conversationId);
 
-			// Update conversation last message in sidebar if it exists
+			// Update conversation last message in sidebar
 			updateConversationLastMessage(conversationId, data.message);
-
-			// Update document title to show notification
-			updateDocumentTitle();
-
-			console.log(`Unread message in conversation ${conversationId}`);
 		}
+
+		// Update document title to show notification
+		updateDocumentTitle();
+
+		console.log(`Unread message in conversation ${conversationId}`);
+	}
+}
+
+// OPTIONAL: Add browser notification support
+function showBrowserNotification(data) {
+	// Check if browser supports notifications
+	if (!("Notification" in window)) {
+		return;
+	}
+
+	// Check if permission is granted
+	if (Notification.permission === "granted") {
+		const notification = new Notification("New Message", {
+			body: `${data.message.sender?.username || 'Someone'}: ${data.message.text || 'Sent an attachment'}`,
+			icon: '/path/to/app-icon.png', // Update with your app icon path
+			badge: '/path/to/badge-icon.png', // Update with your badge icon path
+			tag: data.message.conversationId // Prevents duplicate notifications
+		});
+
+		// Optional: Click notification to focus conversation
+		notification.onclick = function() {
+			window.focus();
+			// You could also auto-select the conversation here
+			notification.close();
+		};
+	} else if (Notification.permission !== "denied") {
+		// Request permission
+		Notification.requestPermission().then(function(permission) {
+			if (permission === "granted") {
+				showBrowserNotification(data);
+			}
+		});
+	}
+}
+
+// OPTIONAL: Add this to your initApp function to request notification permission
+function requestNotificationPermission() {
+	if ("Notification" in window && Notification.permission === "default") {
+		Notification.requestPermission();
 	}
 }
 
@@ -688,6 +748,14 @@ async function selectConversation(data) {
 	chatElements.chatMessages.style.display = "block";
 	chatElements.chatInputArea.style.display = "flex";
 
+	// IMPORTANT: Leave previous conversation if any
+	if (currentConversation && currentRoom) {
+		socket.emit('leaveConversation', {
+			userId: myUserData.id,
+			conversationId: currentConversation._id
+		});
+	}
+
 	// Set current conversation data
 	currentChatType = data.type;
 
@@ -748,11 +816,12 @@ async function selectConversation(data) {
 	// Update avatar
 	chatElements.currentUserAvatar.src = data.avatar;
 
-	// Join socket room
+	// Join socket room - UPDATED to include conversationId
 	socket.emit("joinRoom", {
 		roomName: currentRoom,
 		username: myUserData.username,
 		id: myUserData.id,
+		conversationId: currentConversation._id  // CRITICAL: Send conversationId
 	});
 
 	// Mark conversation as read
@@ -802,10 +871,10 @@ async function sendMessage() {
 
 		const savedMessage = await response.json();
 
-		// Display the sent message immediately
+		// Display the sent message immediately (only for sender)
 		displayMessage(savedMessage, true, savedMessage.isGroup || false);
 
-		// Emit socket event with conversationId
+		// Emit socket event - recipients will get it via socket, not here
 		socket.emit("chatRoom", {
 			room: currentRoom,
 			senderId: myUserData.id,
@@ -1029,6 +1098,16 @@ window.removeUserFromGroup = function (userId) {
 			'<div class="hint">No users selected yet</div>';
 	}
 };
+
+window.addEventListener('beforeunload', () => {
+	if (currentConversation && currentRoom) {
+		socket.emit('leaveConversation', {
+			userId: myUserData.id,
+			conversationId: currentConversation._id
+		});
+	}
+});
+
 
 async function createGroup() {
 	const groupName = groupModalElements.nameInput.value.trim();

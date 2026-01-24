@@ -5,60 +5,35 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Register | Create Your Account</title>
+  <title>Reset Password</title>
   <link rel="stylesheet" href="<?php echo base_url("assets/authstyles.css") ?>">
 </head>
 
 <body>
+  <?php if ($this->session->flashdata('toast_error')): ?>
+    <div id="toast" class="toast error">
+      <?= $this->session->flashdata('toast_error') ?>
+    </div>
+  <?php endif; ?>
+
   <div>
-    <form class="form" method="post" action="<?php echo site_url('AuthController/createUser') ?>" id="registerForm">
+    <form class="form" method="post" action="<?= site_url('AuthController/processResetPassword') ?>" id="resetPasswordForm">
       <div class="flex-column">
-        <h2>Create Account</h2>
+        <h2>Reset Password</h2>
+        <p style="color: #999; font-size: 0.9rem; margin-top: 0.5rem; text-align: center;">
+          Enter your new password below.
+        </p>
       </div>
 
-      <!-- Server-side error message -->
       <?php if (isset($error)): ?>
-        <div class="error-msg">
-          <?php echo $error; ?>
-        </div>
+        <div class="error-msg"><?= $error ?></div>
       <?php endif; ?>
 
-      <!-- Username Field -->
-      <div class="flex-column">
-        <label for="uname">Username</label>
-      </div>
-      <div class="inputForm" id="usernameInput">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="0 0 32 32" height="20">
-          <g data-name="Layer 3" id="Layer_3">
-            <path
-              d="m30.853 13.87a15 15 0 0 0 -29.729 4.082 15.1 15.1 0 0 0 12.876 12.918 15.6 15.6 0 0 0 2.016.13 14.85 14.85 0 0 0 7.715-2.145 1 1 0 1 0 -1.031-1.711 13.007 13.007 0 1 1 5.458-6.529 2.149 2.149 0 0 1 -4.158-.759v-10.856a1 1 0 0 0 -2 0v1.726a8 8 0 1 0 .2 10.325 4.135 4.135 0 0 0 7.83.274 15.2 15.2 0 0 0 .823-7.455zm-14.853 8.13a6 6 0 1 1 6-6 6.006 6.006 0 0 1 -6 6z">
-            </path>
-          </g>
-        </svg>
-        <input placeholder="Choose a username" class="input" type="text" id="uname" name="uname" autocomplete="username"
-          required>
-      </div>
-      <div class="username-validation" id="usernameValidation"></div>
+      <input type="hidden" name="token" value="<?= isset($token) ? $token : '' ?>">
 
-      <!-- Email Field -->
+      <!-- New Password -->
       <div class="flex-column">
-        <label for="email">Email</label>
-      </div>
-      <div class="inputForm" id="emailInput">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="0 0 24 24" height="20" fill="none">
-          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-            d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/>
-          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-            d="m4 7 8 5 8-5"/>
-        </svg>
-        <input placeholder="Enter your email" class="input" type="email" id="email" name="email" 
-          autocomplete="email" required>
-      </div>
-      <div class="email-validation" id="emailValidation"></div>
-
-      <!-- Password Field -->
-      <div class="flex-column">
-        <label for="password">Password</label>
+        <label for="password">New Password</label>
       </div>
       <div class="inputForm" id="passwordInput">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="-64 0 512 512" height="20">
@@ -69,7 +44,7 @@
             d="m304 224c-8.832031 0-16-7.167969-16-16v-80c0-52.929688-43.070312-96-96-96s-96 43.070312-96 96v80c0 8.832031-7.167969 16-16 16s-16-7.167969-16-16v-80c0-70.59375 57.40625-128 128-128s128 57.40625 128 128v80c0 8.832031-7.167969 16-16 16zm0 0">
           </path>
         </svg>
-        <input placeholder="Create a strong password" class="input" type="password" id="password" name="password"
+        <input placeholder="Enter new password" class="input" type="password" id="password" name="password"
           autocomplete="new-password" required>
         <span class="toggle-password" onclick="togglePassword('password')">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="eye-closed">
@@ -89,13 +64,10 @@
       <div class="password-strength" id="passwordStrength" style="display:none;">
         <div class="strength-row">
           <span id="strengthText">Strength: Weak</span>
-          <span class="tooltip-trigger" id="strengthInfo">?</span>
         </div>
-
         <div class="strength-bar">
           <div id="strengthFill"></div>
         </div>
-
         <div class="strength-mini">
           <span id="req-length">8 characters</span>
           <span id="req-uppercase">Uppercase</span>
@@ -103,19 +75,9 @@
           <span id="req-number">Number</span>
           <span id="req-special">Symbol</span>
         </div>
-
-        <div class="tooltip-box" id="tooltipBox">
-          <p>Must include:</p>
-          <ul>
-            <li>8+ characters</li>
-            <li>uppercase & lowercase</li>
-            <li>number</li>
-            <li>special character (!@#$%^&*)</li>
-          </ul>
-        </div>
       </div>
 
-      <!-- Confirm Password Field -->
+      <!-- Confirm Password -->
       <div class="flex-column">
         <label for="cpassword">Confirm Password</label>
       </div>
@@ -128,7 +90,7 @@
             d="m304 224c-8.832031 0-16-7.167969-16-16v-80c0-52.929688-43.070312-96-96-96s-96 43.070312-96 96v80c0 8.832031-7.167969 16-16 16s-16-7.167969-16-16v-80c0-70.59375 57.40625-128 128-128s128 57.40625 128 128v80c0 8.832031-7.167969 16-16 16zm0 0">
           </path>
         </svg>
-        <input placeholder="Confirm your password" class="input" type="password" name="cpassword" id="cpassword"
+        <input placeholder="Confirm new password" class="input" type="password" name="cpassword" id="cpassword"
           autocomplete="new-password" required>
         <span class="toggle-password" onclick="togglePassword('cpassword')">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="eye-closed">
@@ -145,19 +107,11 @@
       </div>
       <div id="confirmPasswordValidation"></div>
 
-      <!-- PHP Form Errors -->
-      <?php if (form_error('password')): ?>
-        <div class="error-msg"><?php echo form_error('password'); ?></div>
-      <?php endif; ?>
-      <?php if (form_error('confirm_password')): ?>
-        <div class="error-msg"><?php echo form_error('confirm_password'); ?></div>
-      <?php endif; ?>
-
       <button class="button-submit" type="submit" id="submitBtn">
-        <span>Create Account</span>
+        <span>Reset Password</span>
       </button>
 
-      <p class="p">Already have an account?
+      <p class="p">Remember your password?
         <span class="span">
           <a href='<?= site_url('AuthController') ?>'>Sign In</a>
         </span>
@@ -168,6 +122,26 @@
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"
     integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
   <script src="<?php echo base_url("assets/js/auth-validation.js") ?>"></script>
+  <script>
+    const toast = document.getElementById("toast");
+    if (toast) {
+      setTimeout(() => toast.classList.add("show"), 100);
+      setTimeout(() => {
+        toast.classList.remove("show");
+        setTimeout(() => toast.remove(), 400);
+      }, 3000);
+    }
+
+    function togglePassword(fieldId) {
+      const field = document.getElementById(fieldId);
+      if (!field) return;
+      const closed = field.parentElement.querySelector(".eye-closed");
+      const open = field.parentElement.querySelector(".eye-open");
+      field.type = field.type === "password" ? "text" : "password";
+      closed.style.display = field.type === "password" ? "block" : "none";
+      open.style.display = field.type === "password" ? "none" : "block";
+    }
+  </script>
 </body>
 
 </html>
