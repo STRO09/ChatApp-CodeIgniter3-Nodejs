@@ -7,7 +7,7 @@ import fs from 'fs';
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { userId } = req.query; // Get userId from query params
+    const { userId } = req.query;
     
     const messages = await Message.find({ conversationId })
       .populate('sender', 'username')
@@ -39,7 +39,7 @@ const markConversationAsRead = async (conversationId, userId) => {
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) return;
 
-    // Check if lastSeenBy exists and is an array
+    // Initialize lastSeenBy if needed
     if (!conversation.lastSeenBy || !Array.isArray(conversation.lastSeenBy)) {
       conversation.lastSeenBy = [];
     }
@@ -48,18 +48,20 @@ const markConversationAsRead = async (conversationId, userId) => {
       entry => entry && entry.userId && entry.userId.toString() === userId.toString()
     );
 
+    const currentTime = new Date();
+
     if (existingIndex !== -1) {
-      conversation.lastSeenBy[existingIndex].lastSeen = new Date();
+      conversation.lastSeenBy[existingIndex].lastSeen = currentTime;
     } else {
       conversation.lastSeenBy.push({
         userId: userId,
-        lastSeen: new Date()
+        lastSeen: currentTime
       });
     }
 
     await conversation.save();
 
-    // Update message statuses to 'read' for this conversation and user
+    // Update message statuses to 'read'
     await Message.updateMany(
       {
         conversationId: conversationId,
@@ -68,77 +70,83 @@ const markConversationAsRead = async (conversationId, userId) => {
       },
       { $set: { status: 'read' } }
     );
+
+    console.log(`[MARK_READ] Conversation ${conversationId} marked as read for user ${userId} at ${currentTime.toISOString()}`);
   } catch (err) {
     console.error("Error marking conversation as read:", err);
   }
 };
 
-// Helper function to get unread count
+// FIXED: Get unread count for a conversation
 export const getUnreadCount = async (conversationId, userId) => {
   try {
     const conversation = await Conversation.findById(conversationId);
-    if (!conversation) return 0;
-
-    // If lastSeenBy doesn't exist or is empty, count all messages from others
-    if (!conversation.lastSeenBy || !Array.isArray(conversation.lastSeenBy) || conversation.lastSeenBy.length === 0) {
-      const unreadCount = await Message.countDocuments({
-        conversationId: conversationId,
-        sender: { $ne: userId },
-        status: { $ne: 'read' }
-      });
-      return unreadCount;
+    if (!conversation) {
+      console.log(`[UNREAD] Conversation ${conversationId} not found`);
+      return 0;
     }
 
-    const lastSeenEntry = conversation.lastSeenBy.find(
-      entry => entry && entry.userId && entry.userId.toString() === userId.toString()
-    );
+    // Find user's last seen timestamp
+    let lastSeenTime = null;
+    
+    if (conversation.lastSeenBy && Array.isArray(conversation.lastSeenBy)) {
+      const lastSeenEntry = conversation.lastSeenBy.find(
+        entry => entry && entry.userId && entry.userId.toString() === userId.toString()
+      );
 
-    let query = {
+      if (lastSeenEntry && lastSeenEntry.lastSeen) {
+        lastSeenTime = lastSeenEntry.lastSeen;
+      }
+    }
+
+    // Build query
+    const query = {
       conversationId: conversationId,
-      sender: { $ne: userId },
-      status: { $ne: 'read' }
+      sender: { $ne: userId }
     };
 
-    // If we have a lastSeenEntry, only count messages after that time
-    if (lastSeenEntry && lastSeenEntry.lastSeen) {
-      query.createdAt = { $gt: lastSeenEntry.lastSeen };
+    if (lastSeenTime) {
+      // User has opened this conversation before
+      // Count messages created AFTER their last seen time
+      query.createdAt = { $gt: lastSeenTime };
+      console.log(`[UNREAD] User ${userId} last saw conversation ${conversationId} at ${lastSeenTime.toISOString()}`);
+    } else {
+      // User has NEVER opened this conversation
+      // Count all unread messages from others
+      query.status = { $ne: 'read' };
+      console.log(`[UNREAD] User ${userId} has never opened conversation ${conversationId}`);
     }
 
     const unreadCount = await Message.countDocuments(query);
+    
+    console.log(`[UNREAD] Final count for conversation ${conversationId}, user ${userId}: ${unreadCount} messages`);
+    
     return unreadCount;
   } catch (err) {
-    console.error("Error getting unread count:", err);
+    console.error("[UNREAD] Error getting unread count:", err);
     return 0;
   }
 };
 
 export const addMessage = async (req, res) => {
   try {
-    // Extract data from form
     const { conversationId, senderId, text } = req.body;
     const file = req.file;
     
-    // Validate required fields
     if (!conversationId || !senderId) {
-      return res.status(400).json({ 
-        error: "Missing required fields" 
-      });
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Fetch conversation details
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({ error: "Conversation not found" });
     }
 
-    // Validate user is part of conversation
     const isParticipant = conversation.participants.some(p => 
       p.toString() === senderId.toString()
     );
     if (!isParticipant) {
-      return res.status(403).json({ 
-        error: "User is not a participant in this conversation" 
-      });
+      return res.status(403).json({ error: "User is not a participant in this conversation" });
     }
 
     // Process attachments
@@ -153,7 +161,6 @@ export const addMessage = async (req, res) => {
         fileSize: file.size
       });
 
-      // Determine message type
       if (file.mimetype.startsWith('image/')) {
         messageType = 'image';
       } else if (file.mimetype.startsWith('video/')) {
@@ -165,7 +172,7 @@ export const addMessage = async (req, res) => {
       }
     }
 
-    // Create message
+    // Create message with 'sent' status
     const newMessage = new Message({
       conversationId,
       sender: senderId,
@@ -177,16 +184,14 @@ export const addMessage = async (req, res) => {
 
     await newMessage.save();
 
-    // Populate sender info
     const populatedMessage = await Message.findById(newMessage._id)
       .populate('sender', 'username');
 
-    // Update conversation's lastMessage and timestamp
+    // Update conversation
     conversation.lastMessage = newMessage._id;
     conversation.updatedAt = Date.now();
     await conversation.save();
 
-    // Prepare response data
     const responseData = {
       _id: populatedMessage._id,
       conversationId,
@@ -208,7 +213,8 @@ export const addMessage = async (req, res) => {
       updatedAt: populatedMessage.updatedAt
     };
 
-    // Return response
+    console.log(`[MESSAGE] New message in conversation ${conversationId} from ${senderId} at ${populatedMessage.createdAt.toISOString()}`);
+
     res.status(201).json(responseData);
 
   } catch (err) {
@@ -227,13 +233,11 @@ export const getSecureFile = async (req, res) => {
       return res.status(400).json({ error: "Missing required parameters" });
     }
 
-    // Find message by ID
     const message = await Message.findById(messageId).populate('conversationId');
     if (!message) {
       return res.status(404).json({ error: "Message not found" });
     }
 
-    // Check if user is part of the conversation
     const isParticipant = message.conversationId.participants.some(p => 
       p.toString() === userId.toString()
     );
@@ -248,7 +252,6 @@ export const getSecureFile = async (req, res) => {
       return res.status(404).json({ error: "File not found on server" });
     }
 
-    // Get file extension and set appropriate content-type
     const ext = path.extname(fileName).toLowerCase();
     const contentTypeMap = {
       '.jpg': 'image/jpeg',

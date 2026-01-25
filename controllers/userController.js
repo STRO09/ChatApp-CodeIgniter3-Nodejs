@@ -125,7 +125,7 @@ export const forgotPassword = async (req, res) => {
     await user.save();
 
     // Create reset URL
-    const resetURL = `${process.env.FRONTEND_URL || 'http://localhost'}/AuthController/resetPassword/${resetToken}`;
+    const resetURL = `${process.env.FRONTEND_URL || 'http://localhost'}/index.php/AuthController/resetPassword/${resetToken}`;
 
     // Email content
     const mailOptions = {
