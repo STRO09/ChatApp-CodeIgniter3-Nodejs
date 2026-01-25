@@ -31,7 +31,7 @@
 
       <!-- Server-side error message -->
       <?php if (isset($error)): ?>
-        <div class="error-msg">
+        <div class="error-msg error">
           <?= $error ?>
         </div>
       <?php endif; ?>

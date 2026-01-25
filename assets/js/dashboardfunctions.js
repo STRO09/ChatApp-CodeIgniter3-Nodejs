@@ -291,7 +291,7 @@ function handleUserListUpdate(users) {
 async function handleIncomingMessage(data) {
 	console.log("New message received via socket:", data);
 
-	// CRITICAL: Check if this is our own message (shouldn't happen but just in case)
+	// Check if this is our own message
 	if (data.senderId === myUserData.id) {
 		console.log("Ignoring own message from socket");
 		return;
@@ -322,11 +322,13 @@ async function handleIncomingMessage(data) {
 		);
 
 		if (!existingConv) {
-			// New conversation - reload conversations to get it
+			// New conversation - reload to get it
 			console.log("New conversation detected, reloading...");
 			await loadConversations();
+			await loadGroups(); // Also reload groups in case it's a new group
 		} else {
-			// Update unread count
+			// FIXED: Increment unread count
+			// This will be synced with server on next reload
 			incrementUnreadCount(conversationId);
 
 			// Update conversation last message in sidebar
@@ -487,11 +489,15 @@ async function loadConversations() {
 		if (data.conversations && data.conversations.length > 0) {
 			allConversations = data.conversations;
 
-			// Initialize unread counts from server
+			// CRITICAL FIX: ALWAYS update unread counts from server
+			// Clear existing counts first
+			unreadCounts = {};
+			
+			// Set counts from server response
 			data.conversations.forEach((conv) => {
-				if (conv.unreadCount > 0) {
-					unreadCounts[conv._id] = conv.unreadCount;
-				}
+				// Set count even if 0 to ensure sync
+				unreadCounts[conv._id] = conv.unreadCount || 0;
+				console.log(`[LOAD] Conversation ${conv._id}: ${conv.unreadCount || 0} unread`);
 			});
 
 			// Update document title
@@ -523,11 +529,11 @@ async function loadGroups() {
 			displayGroups(data.groups);
 			document.getElementById("groups-header").style.display = "block";
 
-			// Initialize unread counts for groups from server
+			// CRITICAL FIX: ALWAYS update unread counts from server
 			data.groups.forEach((group) => {
-				if (group.unreadCount > 0) {
-					unreadCounts[group._id] = group.unreadCount;
-				}
+				// Set count even if 0 to ensure sync
+				unreadCounts[group._id] = group.unreadCount || 0;
+				console.log(`[LOAD_GROUP] Group ${group._id}: ${group.unreadCount || 0} unread`);
 			});
 
 			// Update document title
