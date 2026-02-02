@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import Conversation from '../models/Conversations.js';
+import { handleAiMessage } from '../controllers/aiController.js';
 
 // Store connected users with userId as key
 const connectedUsers = new Map();
@@ -50,7 +51,6 @@ export const initSocket = (server) => {
         // Track that this user is actively viewing this conversation
         if (conversationId) {
           activeConversations.set(userId, conversationId);
-          console.log(`${username} is now actively viewing conversation ${conversationId}`);
         }
         
         console.log(`${username} joined room ${roomName}`);
@@ -131,6 +131,10 @@ export const initSocket = (server) => {
         isTyping: data.isTyping,
         room: data.room
       });
+    });
+
+    socket.on('aiMessage', async (data) => {
+      await handleAiMessage(socket, io, data);
     });
 
     // Handle disconnection

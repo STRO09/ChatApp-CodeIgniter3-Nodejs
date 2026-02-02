@@ -1,5 +1,6 @@
 import express from 'express';
 import { registerUser, loginUser ,getAllUsersForChat,getAllUsers,updateUserStatus, updateUserProfile, getUserById, forgotPassword, resetPassword, verifyResetToken} from '../controllers/userController.js';
+import { getOrCreateAiConversation } from '../controllers/aiController.js';
 
 const router = express.Router();
 
@@ -16,5 +17,8 @@ router.get("/user/:userId", getUserById);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.get('/verify-reset-token/:token', verifyResetToken);
+
+// AI chat
+router.post('/ai/conversation', getOrCreateAiConversation);
 
 export default router;

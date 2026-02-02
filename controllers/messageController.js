@@ -70,8 +70,6 @@ const markConversationAsRead = async (conversationId, userId) => {
       },
       { $set: { status: 'read' } }
     );
-
-    console.log(`[MARK_READ] Conversation ${conversationId} marked as read for user ${userId} at ${currentTime.toISOString()}`);
   } catch (err) {
     console.error("Error marking conversation as read:", err);
   }
@@ -109,7 +107,6 @@ export const getUnreadCount = async (conversationId, userId) => {
       // User has opened this conversation before
       // Count messages created AFTER their last seen time
       query.createdAt = { $gt: lastSeenTime };
-      console.log(`[UNREAD] User ${userId} last saw conversation ${conversationId} at ${lastSeenTime.toISOString()}`);
     } else {
       // User has NEVER opened this conversation
       // Count all unread messages from others
@@ -212,8 +209,6 @@ export const addMessage = async (req, res) => {
       createdAt: populatedMessage.createdAt,
       updatedAt: populatedMessage.updatedAt
     };
-
-    console.log(`[MESSAGE] New message in conversation ${conversationId} from ${senderId} at ${populatedMessage.createdAt.toISOString()}`);
 
     res.status(201).json(responseData);
 
