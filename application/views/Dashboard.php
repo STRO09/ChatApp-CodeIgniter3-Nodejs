@@ -7,7 +7,9 @@
   <title>Chatapp</title>
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <link rel="stylesheet" href="<?php echo base_url("assets/dashboardstyles.css") ?>">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <?php $serverorigin = $this->config->item('server_origin'); ?>
 
@@ -50,6 +52,18 @@
         <div class="section-header">
           <h3>Online Now</h3>
           <span class="online-count" id="online-count" hidden="true">0</span>
+        </div>
+        <div class="ai-chat-entry" id="ai-chat-btn">
+          <div class="ai-chat-avatar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                fill="#6366f1" />
+            </svg>
+          </div>
+          <div class="ai-chat-info">
+            <div class="ai-chat-name">AI Assistant</div>
+            <div class="ai-chat-hint">Ask me anything</div>
+          </div>
         </div>
         <div class="chat-list" id="online-users-list">
           <div class="loading">Loading online users...</div>
@@ -199,7 +213,8 @@
 
         <div class="edit-form-group">
           <label><i class="fas fa-lock"></i> Current Password</label>
-          <input type="password" class="edit-form-input" id="edit-current-password" placeholder="Enter current password">
+          <input type="password" class="edit-form-input" id="edit-current-password"
+            placeholder="Enter current password">
           <div class="password-hint">
             <i class="fas fa-info-circle"></i>
             Required for any changes to your account
@@ -235,11 +250,11 @@
   <script>
     window.APP = {
       // Get username from PHP
-       myRealUsername: <?php echo json_encode($username); ?>,
-       myRealId: <?php echo json_encode($userId); ?>,
+      myRealUsername: <?php echo json_encode($username); ?>,
+      myRealId: <?php echo json_encode($userId); ?>,
 
       // Socket.IO connection
-      serverorigin : <?= json_encode($serverorigin) ?>
+      serverorigin: <?= json_encode($serverorigin) ?>
     }
 
   </script>

@@ -100,6 +100,10 @@ let currentRoom = null;
 let currentConversation = null;
 let currentChatType = null; // 'private' or 'group'
 
+let isAiChat = false;
+let aiConversationId = null;
+let aiStreamingMsgId = null;
+
 let myUserData = {
 	id: APP_CONFIG.myUserId,
 	username: APP_CONFIG.myUsername,
@@ -157,6 +161,7 @@ function setupEventListeners() {
 	setupGroupModalEventListeners();
 	setupProfileEventListeners();
 	setupSocketListeners();
+	setupAiListeners();
 }
 
 function setupChatEventListeners() {
@@ -192,11 +197,11 @@ function setupGroupModalEventListeners() {
 	groupModalElements.createGroupBtn.addEventListener("click", showGroupModal);
 	groupModalElements.close.addEventListener(
 		"click",
-		() => (groupModalElements.modal.style.display = "none")
+		() => (groupModalElements.modal.style.display = "none"),
 	);
 	groupModalElements.cancelBtn.addEventListener(
 		"click",
-		() => (groupModalElements.modal.style.display = "none")
+		() => (groupModalElements.modal.style.display = "none"),
 	);
 	groupModalElements.createBtn.addEventListener("click", createGroup);
 }
@@ -249,6 +254,10 @@ function setupProfileEventListeners() {
 	});
 }
 
+function setupAiListeners() {
+	document.getElementById("ai-chat-btn").addEventListener("click", openAiChat);
+}
+
 // ============================================================================
 // SOCKET EVENT LISTENERS
 // ============================================================================
@@ -258,6 +267,11 @@ function setupSocketListeners() {
 	socket.on("chatRoom", handleIncomingMessage);
 	socket.on("userTyping", handleUserTyping);
 	socket.on("connect_error", handleConnectionError);
+
+	socket.on("aiTyping", handleAiTyping);
+	socket.on("aiStream", handleAiStream);
+	socket.on("aiComplete", handleAiComplete);
+	socket.on("aiError", handleAiError);
 
 	socket.on("disconnect", () => {
 		console.log("Disconnected from socket");
@@ -269,7 +283,7 @@ function handleSocketConnect() {
 	myUserData.socketId = socket.id;
 	userProfileElements.myUserId.textContent = `ID: ${myUserData.id.substring(
 		0,
-		8
+		8,
 	)}...`;
 	userProfileElements.myStatus.className = "user-status online";
 
@@ -280,9 +294,9 @@ function handleUserListUpdate(users) {
 	console.log("Online users updated:", users);
 	onlineUsers = users;
 
-	renderRecentChats(); 
-	updateOnlineUsersDisplay(); 
-	updateUserStatusInLists(); 
+	renderRecentChats();
+	updateOnlineUsersDisplay();
+	updateUserStatusInLists();
 }
 
 // SOCKET EVENT LISTENERS - UPDATED handleIncomingMessage function
@@ -318,7 +332,7 @@ async function handleIncomingMessage(data) {
 
 		// Check if this conversation exists in our list
 		const existingConv = allConversations.find(
-			conv => conv._id === conversationId
+			(conv) => conv._id === conversationId,
 		);
 
 		if (!existingConv) {
@@ -352,21 +366,21 @@ function showBrowserNotification(data) {
 	// Check if permission is granted
 	if (Notification.permission === "granted") {
 		const notification = new Notification("New Message", {
-			body: `${data.message.sender?.username || 'Someone'}: ${data.message.text || 'Sent an attachment'}`,
-			icon: '/path/to/app-icon.png', // Update with your app icon path
-			badge: '/path/to/badge-icon.png', // Update with your badge icon path
-			tag: data.message.conversationId // Prevents duplicate notifications
+			body: `${data.message.sender?.username || "Someone"}: ${data.message.text || "Sent an attachment"}`,
+			icon: "/path/to/app-icon.png", // Update with your app icon path
+			badge: "/path/to/badge-icon.png", // Update with your badge icon path
+			tag: data.message.conversationId, // Prevents duplicate notifications
 		});
 
 		// Optional: Click notification to focus conversation
-		notification.onclick = function() {
+		notification.onclick = function () {
 			window.focus();
 			// You could also auto-select the conversation here
 			notification.close();
 		};
 	} else if (Notification.permission !== "denied") {
 		// Request permission
-		Notification.requestPermission().then(function(permission) {
+		Notification.requestPermission().then(function (permission) {
 			if (permission === "granted") {
 				showBrowserNotification(data);
 			}
@@ -440,7 +454,7 @@ async function saveProfileChanges() {
 					currentPassword: currentPassword,
 					newPassword: newPassword || null,
 				}),
-			}
+			},
 		);
 
 		const data = await response.json();
@@ -452,7 +466,7 @@ async function saveProfileChanges() {
 			userProfileElements.myUsername.textContent = newUsername;
 			profileModalElements.viewUsername.textContent = newUsername;
 			userProfileElements.myAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-				newUsername
+				newUsername,
 			)}&background=6366f1&color=fff&bold=true`;
 			profileModalElements.viewAvatar.src = userProfileElements.myAvatar.src;
 
@@ -482,7 +496,7 @@ async function saveProfileChanges() {
 async function loadConversations() {
 	try {
 		const response = await fetch(
-			`${APP_CONFIG.serverOrigin}/api/${myUserData.id}/conversations`
+			`${APP_CONFIG.serverOrigin}/api/${myUserData.id}/conversations`,
 		);
 		const data = await response.json();
 
@@ -492,12 +506,14 @@ async function loadConversations() {
 			// CRITICAL FIX: ALWAYS update unread counts from server
 			// Clear existing counts first
 			unreadCounts = {};
-			
+
 			// Set counts from server response
 			data.conversations.forEach((conv) => {
 				// Set count even if 0 to ensure sync
 				unreadCounts[conv._id] = conv.unreadCount || 0;
-				console.log(`[LOAD] Conversation ${conv._id}: ${conv.unreadCount || 0} unread`);
+				console.log(
+					`[LOAD] Conversation ${conv._id}: ${conv.unreadCount || 0} unread`,
+				);
 			});
 
 			// Update document title
@@ -521,7 +537,7 @@ async function loadConversations() {
 async function loadGroups() {
 	try {
 		const response = await fetch(
-			`${APP_CONFIG.serverOrigin}/api/${myUserData.id}/groups`
+			`${APP_CONFIG.serverOrigin}/api/${myUserData.id}/groups`,
 		);
 		const data = await response.json();
 
@@ -533,7 +549,9 @@ async function loadGroups() {
 			data.groups.forEach((group) => {
 				// Set count even if 0 to ensure sync
 				unreadCounts[group._id] = group.unreadCount || 0;
-				console.log(`[LOAD_GROUP] Group ${group._id}: ${group.unreadCount || 0} unread`);
+				console.log(
+					`[LOAD_GROUP] Group ${group._id}: ${group.unreadCount || 0} unread`,
+				);
 			});
 
 			// Update document title
@@ -547,7 +565,7 @@ async function loadGroups() {
 async function loadAllUsers() {
 	try {
 		const response = await fetch(
-			`${APP_CONFIG.serverOrigin}/api/users/chat/${myUserData.id}`
+			`${APP_CONFIG.serverOrigin}/api/users/chat/${myUserData.id}`,
 		);
 		const data = await response.json();
 
@@ -564,7 +582,7 @@ async function loadChatHistory(conversationId) {
 
 	try {
 		const response = await fetch(
-			`${APP_CONFIG.serverOrigin}/api/messages/${conversationId}?userId=${myUserData.id}`
+			`${APP_CONFIG.serverOrigin}/api/messages/${conversationId}?userId=${myUserData.id}`,
 		);
 		const messages = await response.json();
 
@@ -588,7 +606,8 @@ async function loadChatHistory(conversationId) {
 			});
 		}
 
-		chatElements.chatMessages.scrollTop = chatElements.chatMessages.scrollHeight;
+		chatElements.chatMessages.scrollTop =
+			chatElements.chatMessages.scrollHeight;
 	} catch (err) {
 		console.error("Error loading chat history:", err);
 	}
@@ -603,9 +622,7 @@ function renderRecentChats() {
 
 	// Create Set of online user IDs for fast lookup
 	const onlineUserIds = new Set(
-		onlineUsers
-			.filter(u => u.userId !== myUserData.id)
-			.map(u => u.userId)
+		onlineUsers.filter((u) => u.userId !== myUserData.id).map((u) => u.userId),
 	);
 
 	console.log("Online user IDs:", Array.from(onlineUserIds));
@@ -613,17 +630,17 @@ function renderRecentChats() {
 	// Filter to only show OFFLINE users in Recent Chats
 	const offlineConversations = allConversations.filter((conv) => {
 		if (conv.isGroup) return false; // Skip groups
-		
+
 		const otherParticipant = conv.participants?.find(
-			(p) => p._id !== myUserData.id
+			(p) => p._id !== myUserData.id,
 		);
-		
+
 		if (!otherParticipant) return false;
-		
+
 		// Only show if user is OFFLINE
 		const isOnline = onlineUserIds.has(otherParticipant._id);
 		console.log(`User ${otherParticipant.username}: online=${isOnline}`);
-		
+
 		return !isOnline; // Show only offline users
 	});
 
@@ -638,9 +655,9 @@ function renderRecentChats() {
 	// Render each offline conversation
 	offlineConversations.forEach((conv) => {
 		const otherParticipant = conv.participants?.find(
-			(p) => p._id !== myUserData.id
+			(p) => p._id !== myUserData.id,
 		);
-		
+
 		if (otherParticipant) {
 			const unreadCount = conv.unreadCount || unreadCounts[conv._id] || 0;
 
@@ -648,7 +665,7 @@ function renderRecentChats() {
 				id: conv._id,
 				name: otherParticipant.username,
 				avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-					otherParticipant.username
+					otherParticipant.username,
 				)}&background=random&color=fff`,
 				lastMessage: conv.lastMessage?.text || "Start chatting",
 				time: formatTime(conv.updatedAt),
@@ -680,7 +697,7 @@ function displayGroups(groups) {
 			avatar:
 				group.groupImage ||
 				`https://ui-avatars.com/api/?name=${encodeURIComponent(
-					group.groupName
+					group.groupName,
 				)}&background=6366f1&color=fff`,
 			lastMessage: group.lastMessage?.text || "No messages yet",
 			time: formatTime(group.updatedAt),
@@ -705,7 +722,7 @@ function createConversationItem(data) {
 		(data.unread || 0) > 0
 			? `<div class="unread-badge">${
 					data.unread > 99 ? "99+" : data.unread
-			  }</div>`
+				}</div>`
 			: "";
 
 	item.innerHTML = `
@@ -715,7 +732,7 @@ function createConversationItem(data) {
 			data.type === "private"
 				? `<div class="chat-status ${
 						data.isOnline ? "online" : "offline"
-				  }"></div>`
+					}"></div>`
 				: ""
 		}
   </div>
@@ -742,6 +759,8 @@ function createConversationItem(data) {
 }
 
 async function selectConversation(data) {
+	isAiChat = false;
+	document.getElementById("ai-chat-btn").classList.remove("active");
 	// Remove active class from all items
 	document
 		.querySelectorAll(".chat-item")
@@ -756,9 +775,9 @@ async function selectConversation(data) {
 
 	// IMPORTANT: Leave previous conversation if any
 	if (currentConversation && currentRoom) {
-		socket.emit('leaveConversation', {
+		socket.emit("leaveConversation", {
 			userId: myUserData.id,
-			conversationId: currentConversation._id
+			conversationId: currentConversation._id,
 		});
 	}
 
@@ -792,7 +811,7 @@ async function selectConversation(data) {
 						userId1: myUserData.id,
 						userId2: data.userId,
 					}),
-				}
+				},
 			);
 
 			const convData = await response.json();
@@ -827,7 +846,7 @@ async function selectConversation(data) {
 		roomName: currentRoom,
 		username: myUserData.username,
 		id: myUserData.id,
-		conversationId: currentConversation._id  // CRITICAL: Send conversationId
+		conversationId: currentConversation._id, // CRITICAL: Send conversationId
 	});
 
 	// Mark conversation as read
@@ -846,6 +865,10 @@ async function selectConversation(data) {
 // MESSAGE HANDLING
 // ============================================================================
 async function sendMessage() {
+	if (isAiChat) {
+		sendAiMessage();
+		return;
+	}
 	const message = chatElements.messageInput.value.trim();
 	const file = fileElements.attachmentInput.files[0];
 
@@ -894,7 +917,8 @@ async function sendMessage() {
 		fileElements.fileName.textContent = "";
 
 		// Scroll to bottom
-		chatElements.chatMessages.scrollTop = chatElements.chatMessages.scrollHeight;
+		chatElements.chatMessages.scrollTop =
+			chatElements.chatMessages.scrollHeight;
 
 		// Update conversation list
 		updateConversationLastMessage(currentConversation._id, savedMessage);
@@ -992,7 +1016,7 @@ async function showGroupModal() {
 	// Load available users
 	try {
 		const response = await fetch(
-			`${APP_CONFIG.serverOrigin}/api/users/all/${myUserData.id}`
+			`${APP_CONFIG.serverOrigin}/api/users/all/${myUserData.id}`,
 		);
 		const data = await response.json();
 
@@ -1022,7 +1046,7 @@ function createUserSelectItem(user) {
     <img src="${
 			user.avatar ||
 			`https://ui-avatars.com/api/?name=${encodeURIComponent(
-				user.username
+				user.username,
 			)}&background=random&color=fff`
 		}" alt="${user.username}">
     <div class="user-select-info">
@@ -1071,7 +1095,7 @@ function toggleUserSelection(user, item) {
 
 		// Remove from selected users list
 		const selectedUserEl = groupModalElements.selectedUsersList.querySelector(
-			`[data-user-id="${userId}"]`
+			`[data-user-id="${userId}"]`,
 		);
 		if (selectedUserEl) selectedUserEl.remove();
 
@@ -1088,13 +1112,13 @@ window.removeUserFromGroup = function (userId) {
 
 	// Update selected users list
 	const selectedUserEl = groupModalElements.selectedUsersList.querySelector(
-		`[data-user-id="${userId}"]`
+		`[data-user-id="${userId}"]`,
 	);
 	if (selectedUserEl) selectedUserEl.remove();
 
 	// Update user select item
 	const userItem = groupModalElements.availableUsersList.querySelector(
-		`[data-user-id="${userId}"]`
+		`[data-user-id="${userId}"]`,
 	);
 	if (userItem) userItem.classList.remove("selected");
 
@@ -1105,15 +1129,14 @@ window.removeUserFromGroup = function (userId) {
 	}
 };
 
-window.addEventListener('beforeunload', () => {
+window.addEventListener("beforeunload", () => {
 	if (currentConversation && currentRoom) {
-		socket.emit('leaveConversation', {
+		socket.emit("leaveConversation", {
 			userId: myUserData.id,
-			conversationId: currentConversation._id
+			conversationId: currentConversation._id,
 		});
 	}
 });
-
 
 async function createGroup() {
 	const groupName = groupModalElements.nameInput.value.trim();
@@ -1190,7 +1213,7 @@ function showGroupManagementModal(conversationId) {
                   <span class="member-name">${u.username}</span>
                   <button class="remove-user btn btn-secondary" data-id="${u._id}">Remove</button>
                 </li>
-              `
+              `,
 								)
 								.join("")}
             </ul>
@@ -1232,7 +1255,7 @@ function showGroupManagementModal(conversationId) {
                 <span class="member-name">${u.username}</span>
                 <button class="remove-user btn btn-secondary" data-id="${u._id}">Remove</button>
               </li>
-            `
+            `,
 								)
 								.join("");
 
@@ -1268,7 +1291,7 @@ function showGroupManagementModal(conversationId) {
               <span class="member-name">${u.username}</span>
               <button class="remove-user btn btn-secondary" data-id="${u._id}">Remove</button>
             </li>
-          `
+          `,
 							)
 							.join("");
 					});
@@ -1278,7 +1301,7 @@ function showGroupManagementModal(conversationId) {
 			modal.querySelector("#delete-group-btn").addEventListener("click", () => {
 				if (
 					confirm(
-						"Are you sure you want to delete this group? This action cannot be undone."
+						"Are you sure you want to delete this group? This action cannot be undone.",
 					)
 				) {
 					fetch(`${APP_CONFIG.serverOrigin}/api/group/${conversationId}`, {
@@ -1310,7 +1333,7 @@ function clearUnreadCount(conversationId) {
 
 function updateUnreadBadge(conversationId, count) {
 	const conversationItem = document.querySelector(
-		`.chat-item[data-id="${conversationId}"]`
+		`.chat-item[data-id="${conversationId}"]`,
 	);
 	if (conversationItem) {
 		let unreadBadge = conversationItem.querySelector(".unread-badge");
@@ -1353,7 +1376,7 @@ async function markConversationAsRead(conversationId) {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ userId: myUserData.id }),
-			}
+			},
 		);
 
 		if (response.ok) {
@@ -1370,7 +1393,7 @@ function startUnreadCheck() {
 	setInterval(async () => {
 		try {
 			const response = await fetch(
-				`${APP_CONFIG.serverOrigin}/api/unread/${myUserData.id}`
+				`${APP_CONFIG.serverOrigin}/api/unread/${myUserData.id}`,
 			);
 			const data = await response.json();
 
@@ -1412,7 +1435,7 @@ function updateOnlineUsersDisplay() {
 		// Find if there's a conversation with this user
 		const existingConv = allConversations.find(
 			(conv) =>
-				!conv.isGroup && conv.participants.some((p) => p._id === user.userId)
+				!conv.isGroup && conv.participants.some((p) => p._id === user.userId),
 		);
 
 		const unreadCount = existingConv ? unreadCounts[existingConv._id] || 0 : 0;
@@ -1421,7 +1444,7 @@ function updateOnlineUsersDisplay() {
 			id: existingConv ? existingConv._id : `online_${user.userId}`,
 			name: user.username,
 			avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-				user.username
+				user.username,
 			)}&background=10b981&color=fff`,
 			lastMessage: "Click to chat",
 			time: "Online",
@@ -1457,7 +1480,7 @@ function updateUserStatusInLists() {
 
 function updateConversationLastMessage(conversationId, message) {
 	const conversationItem = document.querySelector(
-		`.chat-item[data-id="${conversationId}"]`
+		`.chat-item[data-id="${conversationId}"]`,
 	);
 	if (conversationItem) {
 		const lastMessageEl = conversationItem.querySelector(".last-message");
@@ -1472,6 +1495,165 @@ function updateConversationLastMessage(conversationId, message) {
 	}
 }
 
+// ============================================================
+// AI CHAT FUNCTIONS
+// ============================================================
+
+async function openAiChat() {
+	if (!aiConversationId) {
+		try {
+			const res = await fetch(
+				`${APP_CONFIG.serverOrigin}/api/ai/conversation`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ userId: myUserData.id }),
+				},
+			);
+			const data = await res.json();
+			aiConversationId = data.conversation._id;
+		} catch (err) {
+			console.error("[AI] Failed to get conversation:", err);
+			alert("Failed to connect to AI. Please try again.");
+			return;
+		}
+	}
+
+	document
+		.querySelectorAll(".chat-item")
+		.forEach((el) => el.classList.remove("active"));
+	document.getElementById("ai-chat-btn").classList.add("active");
+
+	chatElements.welcomeScreen.style.display = "none";
+	chatElements.chatHeader.style.display = "flex";
+	chatElements.chatMessages.style.display = "block";
+	chatElements.chatInputArea.style.display = "flex";
+
+	if (currentConversation && currentRoom) {
+		socket.emit("leaveConversation", {
+			userId: myUserData.id,
+			conversationId: currentConversation._id,
+		});
+	}
+
+	isAiChat = true;
+	currentConversation = { _id: aiConversationId };
+	currentRoom = `ai_${myUserData.id}`;
+
+	chatElements.currentChatTitle.textContent = "AI Assistant";
+	chatElements.currentChatStatus.innerHTML =
+		'<i class="fas fa-circle" style="color:#6366f1;font-size:10px;"></i> Always available';
+	chatElements.currentUserAvatar.src = "/assets/images/ai-avatar.png";
+
+	await loadChatHistory(aiConversationId);
+
+	if (chatElements.chatMessages.children.length === 0) {
+		const welcome = document.createElement("div");
+		welcome.className = "message ai-welcome";
+		welcome.innerHTML = `
+      <div class="message-content">
+        <span class="ai-badge">AI</span>
+        Hi! I'm your AI assistant. I can help with questions, writing, brainstorming, and more. What's on your mind?
+      </div>
+      <div class="message-time">Just now</div>
+    `;
+		chatElements.chatMessages.appendChild(welcome);
+	}
+
+	chatElements.messageInput.focus();
+}
+
+async function sendAiMessage() {
+	const text = chatElements.messageInput.value.trim();
+	if (!text) return;
+
+	displayMessage(
+		{
+			_id: "temp_" + Date.now(),
+			text,
+			sender: { _id: myUserData.id, username: myUserData.username },
+			createdAt: new Date(),
+			attachments: [],
+		},
+		true,
+		false,
+	);
+
+	chatElements.chatMessages.scrollTop = chatElements.chatMessages.scrollHeight;
+	chatElements.messageInput.value = "";
+
+	socket.emit("aiMessage", {
+		userId: myUserData.id,
+		conversationId: aiConversationId,
+		text,
+	});
+}
+
+function handleAiTyping(data) {
+	if (data.conversationId !== aiConversationId) return;
+	chatElements.typingIndicator.innerHTML =
+		'<span class="ai-badge">AI</span> is thinking...';
+	chatElements.typingIndicator.style.display = "block";
+}
+
+function handleAiStream(data) {
+	if (data.conversationId !== aiConversationId) return;
+
+	chatElements.typingIndicator.style.display = "none";
+
+	if (aiStreamingMsgId !== data.messageId) {
+		aiStreamingMsgId = data.messageId;
+
+		const msgDiv = document.createElement("div");
+		msgDiv.className = "message received";
+		msgDiv.id = "ai-msg-" + data.messageId;
+		msgDiv.innerHTML = `
+      <div class="message-content">
+        <span class="ai-badge">AI</span><span class="ai-text"></span>
+      </div>
+      <div class="message-time">Just now</div>
+    `;
+		chatElements.chatMessages.appendChild(msgDiv);
+	}
+
+	const bubble = document.getElementById("ai-msg-" + data.messageId);
+	if (bubble) {
+		bubble.querySelector(".ai-text").textContent += data.chunk;
+		chatElements.chatMessages.scrollTop =
+			chatElements.chatMessages.scrollHeight;
+	}
+}
+
+function handleAiComplete(data) {
+	if (data.conversationId !== aiConversationId) return;
+
+	const bubble = document.getElementById("ai-msg-" + data.messageId);
+	if (bubble) {
+		bubble.classList.add("ai-stream-done");
+		bubble.querySelector(".message-time").textContent =
+			new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	}
+
+	aiStreamingMsgId = null;
+}
+
+function handleAiError(data) {
+	if (data.conversationId !== aiConversationId) return;
+
+	chatElements.typingIndicator.style.display = "none";
+	aiStreamingMsgId = null;
+
+	const errDiv = document.createElement("div");
+	errDiv.className = "message received ai-error-msg";
+	errDiv.innerHTML = `
+    <div class="message-content">
+      <span class="ai-badge error">!</span>${data.error}
+    </div>
+    <div class="message-time">Just now</div>
+  `;
+	chatElements.chatMessages.appendChild(errDiv);
+	chatElements.chatMessages.scrollTop = chatElements.chatMessages.scrollHeight;
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
