@@ -1,11 +1,25 @@
 import express from 'express';
 import { registerUser, loginUser ,getAllUsersForChat,getAllUsers,updateUserStatus, updateUserProfile, getUserById, forgotPassword, resetPassword, verifyResetToken} from '../controllers/userController.js';
 import { getOrCreateAiConversation } from '../controllers/aiController.js';
+import {
+  authenticateToken,
+  authenticateAndVerifyUser,
+} from "../middleware/authMiddleware.js";
+
 
 const router = express.Router();
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post("/refresh", refreshAccessToken);
+
+// Logout
+router.post("/logout", authenticateToken, logoutUser);
+router.post("/logout-all", authenticateToken, logoutAllDevices);
+
+// Session Management
+router.get("/sessions", authenticateToken, getActiveSessions);
+router.delete("/sessions/:sessionId", authenticateToken, revokeUserSession);
 
 router.get('/users/chat/:userId', getAllUsersForChat);
 router.get('/users/all/:userId', getAllUsers); 

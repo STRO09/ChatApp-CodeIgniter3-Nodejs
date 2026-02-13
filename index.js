@@ -23,15 +23,28 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middleware
-app.use(cors({
-  origin: ["http://localhost", "http://127.0.0.1", "http://10.10.15.140", 'http://[::1]'],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
-app.use(express.json());
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || "http://localhost" || 'http://[::1]',
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true, // Allow cookies
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
-app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(uploadsDir));
+
+
+if  (process.env.NODE_ENV !== "production") {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`, {
+      body: req.body,
+      cookies: req.cookies,
+    });
+    next();
+  });
+}
 
 // DB connection
 connectDB();
@@ -40,6 +53,31 @@ connectDB();
 app.use('/api', userRoutes);
 app.use('/api', conversationRoutes);
 app.use('/api', messageRoutes);
+
+app.use("*", (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 404,
+      message: "Route not found",
+      path: req.originalUrl,
+    },
+  });
+});
+
+app.use(errorHandler);
+
+// Will keep cleanup optional for now since we detect token reuse and dont got memory problems for now
+// Cleanup expired tokens every hour
+// setInterval(async () => {
+//   try {
+//     await cleanupExpiredTokens();
+//   } catch (error) {
+//     console.error("Error cleaning up expired tokens:", error);
+//   }
+// }, 60 * 60 * 1000); // 1 hour
+
+
 
 // Create HTTP server
 const server = createServer(app);
@@ -51,4 +89,18 @@ initSocket(server);
 const PORT = process.env.PORT || 7360;
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
+});
+
+
+// Graceful Shutdown
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, shutting down gracefully...");
+  await mongoose.connection.close();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("SIGINT received, shutting down gracefully...");
+  await mongoose.connection.close();
+  process.exit(0);
 });

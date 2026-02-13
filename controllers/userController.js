@@ -3,6 +3,21 @@ import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import {
+  generateTokenPair,
+  verifyRefreshToken,
+  invalidateRefreshToken,
+  invalidateAllUserTokens,
+  rotateRefreshToken,
+  getUserActiveSessions,
+  revokeSession,
+} from "../utils/tokenUtils.js";
+import {
+  ErrorCodes,
+  throwError,
+  successResponse,
+  asyncHandler,
+} from "../helpers/ErrorHandler.js";
 
 // Email transporter configuration
 const transporter = nodemailer.createTransport({
@@ -13,256 +28,384 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Register User
-export const registerUser = async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
 
-    if (!username || !email || !password) {
-      return res
-        .status(400)
-        .json({ error: "Username, email and password are required" });
-    }
+/** 
+ * Helper to extract client info
+ */
+const getClientInfo = (req) => {
+  return {
+    ipAddress: req.ip || req.connection.remoteAddress,
+    userAgent: req.headers["user-agent"] || "Unknown",
+  };
+};
+  
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: "Invalid email format" });
-    }
-
-    // Check if username exists
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(409).json({ error: "Username already taken" });
-    }
-
-    // Check if email exists
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      return res.status(409).json({ error: "Email already registered" });
-    }
-
-    const hashedPassword = bcrypt.hashSync(password, 10);
-
-    const newUser = new User({ username, email, password: hashedPassword });
-    await newUser.save();
-
-    res.status(201).json({ message: "User registered successfully!" });
-  } catch (err) {
-    console.error("Error saving user:", err);
-
-    if (err.name === "ValidationError") {
-      return res
-        .status(400)
-        .json({ error: "Invalid data format", details: err.message });
-    }
-
-    if (err.code === 11000) {
-      return res.status(409).json({ error: "Duplicate entry detected" });
-    }
-
-    res.status(500).json({ error: "Internal server error" });
-  }
+/** 
+ * Helper to generate session ID
+ */
+const generateSessionId = () => {
+  return crypto.randomBytes(16).toString("hex");
 };
 
-// Login User
-export const loginUser = async (req, res) => {
-  try {
-    const { username, password } = req.body;
+/**
+ * Helper to set refresh token cookie
+ */
+const setRefreshTokenCookie = (res, refreshToken) => {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // HTTPS only in production
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
+  };
 
-    if (!username || !password) {
-      return res
-        .status(400)
-        .send({ error: "Username and password are required" });
-    }
+  res.cookie("refreshToken", refreshToken, cookieOptions);
+};
 
-    // Find user by username or email
-    const existingUser = await User.findOne({
-      $or: [{ username: username }, { email: username }],
+/**
+ * Helper to clear refresh token cookie
+ */
+const clearRefreshTokenCookie = (res) => {
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+  });
+};
+
+
+export const registerUser = asyncHandler(async (req, res) => {
+  const { username, email, password } = req.body;
+
+  // Validation
+  if (!username || !email || !password) {
+    throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
+      fields: ["username", "email", "password"],
     });
+  }
 
-    if (!existingUser) {
-      return res.status(404).send({ error: "User doesn't exist!" });
-    }
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throwError(ErrorCodes.VALIDATION_INVALID_EMAIL);
+  }
 
-    const validPass = await bcrypt.compare(password, existingUser.password);
-    if (!validPass) {
-      return res.status(401).send({ error: "Incorrect password" });
-    }
+  // Validate password strength
+  if (password.length < 6) {
+    throwError(ErrorCodes.VALIDATION_INVALID_PASSWORD, {
+      requirement: "Password must be at least 6 characters",
+    });
+  }
 
-    const token = jwt.sign(
-      {
-        id: existingUser._id,
-        username: existingUser.username,
-        email: existingUser.email,
-      },
-      "secret_key",
-      { expiresIn: "1h" },
+  // Check if username exists
+  const existingUser = await User.findOne({ username });
+  if (existingUser) {
+    throwError(ErrorCodes.USER_USERNAME_EXISTS);
+  }
+
+  // Check if email exists
+  const existingEmail = await User.findOne({ email });
+  if (existingEmail) {
+    throwError(ErrorCodes.USER_EMAIL_EXISTS);
+  }
+
+  const hashedPassword = bcrypt.hashSync(password, 10);
+  const newUser = new User({
+    username,
+    email,
+    password: hashedPassword,
+  });
+
+  await newUser.save();
+
+  res.status(201).json(
+    successResponse(
+      { userId: newUser._id },
+      "User registered successfully"
+    )
+  );
+});
+
+/**
+ * Login User
+ */
+export const loginUser = asyncHandler(async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
+      fields: ["username", "password"],
+    });
+  }
+
+  const user = await User.findOne({
+    $or: [{ username }, { email: username }],
+  });
+
+  if (!user) {
+    throwError(ErrorCodes.AUTH_INVALID_CREDENTIALS);
+  }
+
+  const validPassword = await bcrypt.compare(password, user.password);
+  if (!validPassword) {
+    throwError(ErrorCodes.AUTH_INVALID_CREDENTIALS);
+  }
+
+  const sessionId = generateSessionId();
+  const { ipAddress, userAgent } = getClientInfo(req);
+
+  const { accessToken, refreshToken, expiresIn } =
+    await generateTokenPair(
+      user,
+      sessionId,
+      ipAddress,
+      userAgent
     );
 
-    res.json({ message: "Logged in successfully", token });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Internal Server Error");
+  setRefreshTokenCookie(res, refreshToken);
+
+  res.json(
+    successResponse(
+      {
+        accessToken,
+        expiresIn,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+        },
+      },
+      "Login successful"
+    )
+  );
+});
+
+/**
+ * Refresh Token
+ */
+export const refreshAccessToken = asyncHandler(async (req, res) => {
+  const oldRefreshToken = req.cookies.refreshToken;
+
+  if (!oldRefreshToken) {
+    throwError(ErrorCodes.AUTH_REFRESH_TOKEN_INVALID);
   }
-};
 
-// Forgot Password - Generate reset token and send email
-export const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
+  const tokenData = await verifyRefreshToken(oldRefreshToken);
 
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
+  const { ipAddress, userAgent } = getClientInfo(req);
+  const sessionId = tokenData.sessionId;
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res
-        .status(404)
-        .json({ error: "No account found with that email" });
-    }
+  const { accessToken, refreshToken: newRefreshToken, expiresIn } =
+    await generateTokenPair(
+      tokenData.userId,
+      sessionId,
+      ipAddress,
+      userAgent
+    );
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+  await invalidateRefreshToken(oldRefreshToken);
+  setRefreshTokenCookie(res, newRefreshToken);
 
-    // Set token and expiry (1 hour)
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-    await user.save();
+  res.json(
+    successResponse(
+      {
+        accessToken,
+        expiresIn,
+        user: {
+          id: tokenData.userId._id,
+          username: tokenData.userId.username,
+          email: tokenData.userId.email,
+        },
+      },
+      "Token refreshed successfully"
+    )
+  );
+});
 
-    // Create reset URL
-    const resetURL = `${process.env.FRONTEND_URL || "http://localhost"}/index.php/AuthController/resetPassword/${resetToken}`;
+/**
+ * Logout User
+ */
+export const logoutUser = asyncHandler(async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
 
-    // Email content
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: user.email,
-      subject: "Password Reset Request",
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>You requested a password reset for your account.</p>
-        <p>Click the link below to reset your password:</p>
-        <a href="${resetURL}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this, please ignore this email.</p>
-      `,
-    };
-
-    // Send email
-    await transporter.sendMail(mailOptions);
-
-    res.json({ message: "Password reset link sent to your email" });
-  } catch (err) {
-    console.error("Error in forgot password:", err);
-    res.status(500).json({ error: "Error sending reset email" });
+  if (refreshToken) {
+    await invalidateRefreshToken(refreshToken);
   }
-};
 
-// Reset Password - Verify token and update password
-export const resetPassword = async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
+  clearRefreshTokenCookie(res);
+  res.json(successResponse(null, "Logged out successfully"));
+});
 
-    if (!token || !newPassword) {
-      return res
-        .status(400)
-        .json({ error: "Token and new password are required" });
-    }
+/**
+ * Logout from all devices
+ */
+export const logoutAllDevices = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
 
-    // Hash the token to compare with stored hash
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  await invalidateAllUserTokens(userId);
+  clearRefreshTokenCookie(res);
 
-    // Find user with valid token
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
+  res.json(
+    successResponse(null, "Logged out from all devices successfully")
+  );
+});
+
+/**
+ * Get Active Sessions
+ */
+export const getActiveSessions = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const sessions = await getUserActiveSessions(userId);
+
+  res.json(
+    successResponse(
+      sessions.map((session) => ({
+        sessionId: session.sessionId,
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
+        lastUsed: session.lastUsedAt,
+        createdAt: session.createdAt,
+      })),
+      "Active sessions retrieved"
+    )
+  );
+});
+
+/**
+ * Revoke specific session
+ */
+export const revokeUserSession = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { sessionId } = req.params;
+
+  if (!sessionId) {
+    throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
+      fields: ["sessionId"],
     });
-
-    if (!user) {
-      return res.status(400).json({ error: "Invalid or expired reset token" });
-    }
-
-    // Update password
-    user.password = bcrypt.hashSync(newPassword, 10);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
-
-    res.json({ message: "Password reset successful" });
-  } catch (err) {
-    console.error("Error resetting password:", err);
-    res.status(500).json({ error: "Error resetting password" });
   }
-};
 
-// Verify Reset Token
-export const verifyResetToken = async (req, res) => {
-  try {
-    const { token } = req.params;
+  await revokeSession(userId, sessionId);
+  res.json(successResponse(null, "Session revoked successfully"));
+});
 
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+/**
+ * Forgot Password
+ */
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
 
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
+  if (!email) {
+    throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
+      fields: ["email"],
     });
-
-    if (!user) {
-      return res
-        .status(400)
-        .json({ valid: false, error: "Invalid or expired reset token" });
-    }
-
-    res.json({ valid: true });
-  } catch (err) {
-    console.error("Error verifying token:", err);
-    res.status(500).json({ valid: false, error: "Error verifying token" });
   }
-};
 
-export const getAllUsersForChat = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { excludeConversations = "false" } = req.query;
-
-    const currentUser = await User.findById(userId);
-    if (!currentUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const users = await User.find({
-      _id: { $ne: userId },
-      isBot: { $ne: true },
-    })
-      .select("username email avatar status lastSeen isOnline")
-      .sort({
-        isOnline: -1,
-        username: 1,
-      });
-
-    const formattedUsers = users.map((user) => ({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar:
-        user.avatar ||
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=random`,
-      status: user.status,
-      isOnline: user.isOnline,
-      lastSeen: user.lastSeen,
-    }));
-
-    res.json({ users: formattedUsers });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error fetching users" });
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) {
+    throwError(ErrorCodes.USER_NOT_FOUND, { email });
   }
-};
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpires = Date.now() + 3600000;
+  await user.save();
+
+  const resetURL = `${process.env.FRONTEND_URL || "http://localhost"}/index.php/AuthController/resetPassword/${resetToken}`;
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: "Password Reset Request",
+    html: `<p>Reset your password: <a href="${resetURL}">Reset</a></p>`,
+  });
+
+  res.json(successResponse(null, "Password reset link sent to your email"));
+});
+
+/**
+ * Reset Password
+ */
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
+      fields: ["token", "newPassword"],
+    });
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throwError(ErrorCodes.AUTH_TOKEN_INVALID, {
+      reason: "Reset token is invalid or expired",
+    });
+  }
+
+  user.password = bcrypt.hashSync(newPassword, 10);
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save();
+
+  await invalidateAllUserTokens(user._id);
+
+  res.json(successResponse(null, "Password reset successful"));
+});
+
+/**
+ * Verify Reset Token
+ */
+export const verifyResetToken = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.json({
+      valid: false,
+      error: "Invalid or expired reset token",
+    });
+  }
+
+  res.json({ valid: true });
+});
+
+/**
+ * Get all users for chat
+ */
+export const getAllUsersForChat = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const currentUser = await User.findById(userId);
+  if (!currentUser) {
+    throwError(ErrorCodes.USER_NOT_FOUND);
+  }
+
+  const users = await User.find({
+    _id: { $ne: userId },
+    isBot: { $ne: true },
+  });
+
+  res.json(successResponse({ users }));
+});
+
 
 export const getAllUsers = async (req, res) => {
   try {
@@ -292,6 +435,65 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
+/**
+ * Update user profile
+ */
+export const updateUserProfile = asyncHandler(async (req, res) => {
+  const { userId, username, email, currentPassword, newPassword } = req.body;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throwError(ErrorCodes.USER_NOT_FOUND);
+  }
+
+  if (username && username !== user.username) {
+    const existingUser = await User.findOne({
+      username,
+      _id: { $ne: userId },
+    });
+    if (existingUser) {
+      throwError(ErrorCodes.USER_USERNAME_EXISTS);
+    }
+  }
+
+  if (email && email !== user.email) {
+    const existingEmail = await User.findOne({
+      email,
+      _id: { $ne: userId },
+    });
+    if (existingEmail) {
+      throwError(ErrorCodes.USER_EMAIL_EXISTS);
+    }
+  }
+
+  if (newPassword || username || email) {
+    if (!currentPassword) {
+      throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
+        fields: ["currentPassword"],
+      });
+    }
+
+    const isValidPassword = bcrypt.compareSync(
+      currentPassword,
+      user.password
+    );
+    if (!isValidPassword) {
+      throwError(ErrorCodes.AUTH_INVALID_CREDENTIALS);
+    }
+  }
+
+  const updateData = {};
+  if (username) updateData.username = username;
+  if (email) updateData.email = email;
+  if (newPassword) {
+    updateData.password = bcrypt.hashSync(newPassword, 10);
+  }
+
+  await User.findByIdAndUpdate(userId, updateData);
+  res.json(successResponse(null, "Profile updated successfully"));
+});
+
+
 export const updateUserStatus = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -316,91 +518,5 @@ export const updateUserStatus = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error updating user status" });
-  }
-};
-
-export const updateUserProfile = async (req, res) => {
-  try {
-    const { userId, username, email, currentPassword, newPassword } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.json({ success: false, error: "User not found" });
-    }
-
-    // Check username uniqueness
-    if (username && username !== user.username) {
-      const existingUser = await User.findOne({
-        username: username,
-        _id: { $ne: userId },
-      });
-
-      if (existingUser) {
-        return res.json({ success: false, error: "Username already taken" });
-      }
-    }
-
-    // Check email uniqueness
-    if (email && email !== user.email) {
-      const existingEmail = await User.findOne({
-        email: email,
-        _id: { $ne: userId },
-      });
-
-      if (existingEmail) {
-        return res.json({ success: false, error: "Email already in use" });
-      }
-    }
-
-    // Verify current password for any change
-    if (
-      newPassword ||
-      (username && username !== user.username) ||
-      (email && email !== user.email)
-    ) {
-      if (!currentPassword) {
-        return res.json({ success: false, error: "Current password required" });
-      }
-
-      const isValidPassword = bcrypt.compareSync(
-        currentPassword,
-        user.password,
-      );
-      if (!isValidPassword) {
-        return res.json({
-          success: false,
-          error: "Current password incorrect",
-        });
-      }
-    }
-
-    // Update data
-    const updateData = {};
-    if (username) updateData.username = username;
-    if (email) updateData.email = email;
-    if (newPassword) {
-      updateData.password = bcrypt.hashSync(newPassword, 10);
-    }
-
-    await User.findByIdAndUpdate(userId, updateData);
-
-    res.json({
-      success: true,
-      message: "Profile updated successfully",
-    });
-  } catch (error) {
-    console.error("Error updating profile:", error);
-    res.status(500).json({ success: false, error: "Internal server error" });
-  }
-};
-
-export const getUserById = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const user = await User.findById(userId).select("username email");
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ error: "Error fetching user" });
   }
 };
