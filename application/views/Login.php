@@ -24,17 +24,13 @@
   <?php endif; ?>
 
   <div>
-    <form class="form" method="post" action="<?= site_url('AuthController/loginUser') ?>" id="loginForm">
+    <form class="form" id="loginForm">
       <div class="flex-column">
         <h2>Welcome Back</h2>
       </div>
 
-      <!-- Server-side error message -->
-      <?php if (isset($error)): ?>
-        <div class="error-msg error">
-          <?= $error ?>
-        </div>
-      <?php endif; ?>
+      <!-- Error message container -->
+      <div id="errorMessage" class="error-msg" style="display: none;"></div>
 
       <!-- Username/Email Field -->
       <div class="flex-column">
@@ -51,7 +47,6 @@
         <input placeholder="Enter your username or email" class="input" type="text" name="uname" id="uname"
           autocomplete="username" required>
       </div>
-      <div id="usernameValidation"></div>
 
       <!-- Password Field -->
       <div class="flex-column">
@@ -86,7 +81,7 @@
         <a href="<?= site_url('AuthController/forgotPassword') ?>" class="span" style="cursor: pointer;">Forgot password?</a>
       </div>
 
-      <button class="button-submit" type="submit">
+      <button class="button-submit" type="submit" id="submitBtn">
         <span>Sign In</span>
       </button>
 
@@ -98,8 +93,6 @@
     </form>
   </div>
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
-    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
   <script>
     // Toast notification
     const toast = document.getElementById("toast");
@@ -110,8 +103,72 @@
         setTimeout(() => toast.remove(), 400);
       }, 3000);
     }
+
+    // Password toggle function
+    function togglePassword(fieldId) {
+      const field = document.getElementById(fieldId);
+      const parent = field.parentElement;
+      const eyeClosed = parent.querySelector('.eye-closed');
+      const eyeOpen = parent.querySelector('.eye-open');
+
+      if (field.type === 'password') {
+        field.type = 'text';
+        eyeClosed.style.display = 'none';
+        eyeOpen.style.display = 'block';
+      } else {
+        field.type = 'password';
+        eyeClosed.style.display = 'block';
+        eyeOpen.style.display = 'none';
+      }
+    }
   </script>
-  <script src="<?php echo base_url("assets/js/auth-validation.js") ?>"></script>
+  <script src="<?php echo base_url("assets/js/token-manager.js") ?>"></script>
+  <script>
+    // Handle login form submission
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const submitBtn = document.getElementById('submitBtn');
+      const errorMessage = document.getElementById('errorMessage');
+      const originalBtnContent = submitBtn.innerHTML;
+
+      // Disable button and show loading
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Signing in...</span>';
+      errorMessage.style.display = 'none';
+
+      try {
+        const username = document.getElementById('uname').value;
+        const password = document.getElementById('password').value;
+
+        const response = await apiClient.post('login', {
+          username,
+          password
+        });
+
+        if (response.success && response.data.accessToken) {
+          // Store access token
+          apiClient.handleLoginResponse(response);
+
+          // Redirect to dashboard
+          window.location.href = '<?= site_url('DashboardController') ?>';
+        } else {
+          // Show error
+          const error = response.error?.message || 'Login failed';
+          errorMessage.textContent = error;
+          errorMessage.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnContent;
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        errorMessage.textContent = 'Server unreachable. Please try again later.';
+        errorMessage.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnContent;
+      }
+    });
+  </script>
 </body>
 
 </html>

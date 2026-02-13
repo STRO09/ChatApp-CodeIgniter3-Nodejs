@@ -30,94 +30,74 @@ class AuthController extends CI_Controller
 
         if ($this->form_validation->run() == false) {
             $this->load->view("Register");
-        } else {
-            $serverorigin = $this->config->item('server_origin');
-            $url = $serverorigin . "/api/register";
-            
-            $data = [
-                "username" => $this->input->post("uname"),
-                "email" => $this->input->post("email"),
-                "password" => $this->input->post("password"),
-            ];
-
-            $response = $this->curl_library->simple_post($url, $data);
-
-            if ($response === false || empty($response)) {
-                $data["error"] = "Auth server unreachable";
-                $this->load->view("Register", $data);
-                return;
-            }
-
-            $res = json_decode($response, true);
-
-            if (isset($res["error"])) {
-                $data["error"] = $res["error"];
-                $this->load->view("Register", $data);
-                return;
-            }
-
-            $this->session->set_flashdata(
-                'toast_success',
-                'Registration successful. Please login.'
-            );
-            redirect("AuthController", "refresh");
+            return;
         }
+
+        $postData = [
+            "username" => $this->input->post("uname"),
+            "email" => $this->input->post("email"),
+            "password" => $this->input->post("password"),
+        ];
+
+        // Make API request
+        $response = $this->api_client->post('register', $postData);
+        $result = $this->api_client->handleResponse($response);
+
+        if (!$result['success']) {
+            $errorMessage = isset($result['error']['message'])
+                ? $result['error']['message']
+                : 'Registration failed';
+
+            $data["error"] = $errorMessage;
+            $this->load->view("Register", $data);
+            return;
+        }
+
+        $this->session->set_flashdata(
+            'toast_success',
+            'Registration successful. Please login.'
+        );
+        redirect("AuthController", "refresh");
     }
 
     public function loginUser()
     {
-        $serverorigin = $this->config->item('server_origin');
-        $url = $serverorigin . "/api/login";
-        
-        $data = [
+        $postData = [
             "username" => $this->input->post("uname"),
             "password" => $this->input->post("password"),
         ];
 
-        $response = $this->curl_library->simple_post($url, $data);
+        // Make API request
+        $response = $this->api_client->post('login', $postData);
+        $result = $this->api_client->handleResponse($response);
 
-        if ($response === false || empty($response)) {
-            $data["error"] = "Auth server unreachable";
+        if (!$result['success']) {
+            $errorMessage = isset($result['error']['message'])
+                ? $result['error']['message']
+                : 'Login failed';
+
+            $data["error"] = $errorMessage;
             $this->load->view("Login", $data);
             return;
         }
 
-        $res = json_decode($response, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $data["error"] = $response;
-            $this->load->view("Login", $data);
-            return;
+        // Store user data in session
+        if (isset($result['data']['user'])) {
+            $user = $result['data']['user'];
+            $this->session->set_userdata("username", $user['username']);
+            $this->session->set_userdata("userId", $user['id']);
+            $this->session->set_userdata("email", $user['email']);
         }
 
-        if (isset($res["token"])) {
-            $token = $res["token"];
-            $payload = decode_jwt($token);
-
-            if ($payload && isset($payload["username"])) {
-                $this->session->set_userdata("username", $payload["username"]);
-                $this->session->set_userdata("userId", $payload["id"]);
-                if (isset($payload["email"])) {
-                    $this->session->set_userdata("email", $payload["email"]);
-                }
-            }
-
-            set_cookie([
-                "name" => "jwt_token",
-                "value" => $res["token"],
-                "expire" => 7 * 24 * 60 * 60,
-                "secure" => false,
-                "httponly" => true,
-            ]);
-
-            redirect("DashboardController");
-            return;
+        // Store access token info for client-side
+        if (isset($result['data']['accessToken'])) {
+            $this->session->set_userdata("has_access_token", true);
+            // Note: The actual token will be stored in localStorage on client side
+            // We just set a flag here to indicate the user is authenticated
         }
 
-        $data["error"] = isset($res["error"]) ? $res["error"] : "Login Failed!";
-        $this->load->view("Login", $data);
+        redirect("DashboardController");
     }
-
     public function forgotPassword()
     {
         $this->load->view("ForgotPassword");
@@ -133,22 +113,16 @@ class AuthController extends CI_Controller
             return;
         }
 
-        $serverorigin = $this->config->item('server_origin');
-        $url = $serverorigin . "/api/forgot-password";
-        
         $postData = ["email" => $email];
-        $response = $this->curl_library->simple_post($url, $postData);
+        $response = $this->api_client->post('forgot-password', $postData);
+        $result = $this->api_client->handleResponse($response);
 
-        if ($response === false || empty($response)) {
-            $data["error"] = "Server unreachable. Please try again later.";
-            $this->load->view("ForgotPassword", $data);
-            return;
-        }
+        if (!$result['success']) {
+            $errorMessage = isset($result['error']['message'])
+                ? $result['error']['message']
+                : 'Failed to send reset link';
 
-        $res = json_decode($response, true);
-
-        if (isset($res["error"])) {
-            $data["error"] = $res["error"];
+            $data["error"] = $errorMessage;
             $this->load->view("ForgotPassword", $data);
             return;
         }
@@ -168,21 +142,12 @@ class AuthController extends CI_Controller
             return;
         }
 
-        // Verify token with backend
-        $serverorigin = $this->config->item('server_origin');
-        $url = $serverorigin . "/api/verify-reset-token/" . $token;
         
-        $response = $this->curl_library->simple_get($url);
+        // Verify token with backend
+        $response = $this->api_client->get("verify-reset-token/{$token}");
+        $result = $this->api_client->handleResponse($response);
 
-        if ($response === false || empty($response)) {
-            $this->session->set_flashdata('toast_error', 'Server unreachable');
-            redirect("AuthController", "refresh");
-            return;
-        }
-
-        $res = json_decode($response, true);
-
-        if (!isset($res["valid"]) || !$res["valid"]) {
+        if (!isset($result["valid"]) || !$result["valid"]) {
             $this->session->set_flashdata('toast_error', 'Invalid or expired reset link');
             redirect("AuthController", "refresh");
             return;
@@ -191,6 +156,7 @@ class AuthController extends CI_Controller
         $data["token"] = $token;
         $this->load->view("ResetPassword", $data);
     }
+
 
     public function processResetPassword()
     {
@@ -212,27 +178,21 @@ class AuthController extends CI_Controller
             return;
         }
 
-        $serverorigin = $this->config->item('server_origin');
-        $url = $serverorigin . "/api/reset-password";
-        
+
         $postData = [
             "token" => $token,
             "newPassword" => $password
         ];
 
-        $response = $this->curl_library->simple_post($url, $postData);
+        $response = $this->api_client->post('reset-password', $postData);
+        $result = $this->api_client->handleResponse($response);
 
-        if ($response === false || empty($response)) {
-            $data["error"] = "Server unreachable. Please try again later.";
-            $data["token"] = $token;
-            $this->load->view("ResetPassword", $data);
-            return;
-        }
-
-        $res = json_decode($response, true);
-
-        if (isset($res["error"])) {
-            $data["error"] = $res["error"];
+        if (!$result['success']) {
+            $errorMessage = isset($result['error']['message']) 
+                ? $result['error']['message'] 
+                : 'Failed to reset password';
+            
+            $data["error"] = $errorMessage;
             $data["token"] = $token;
             $this->load->view("ResetPassword", $data);
             return;
@@ -245,14 +205,33 @@ class AuthController extends CI_Controller
         redirect("AuthController", "refresh");
     }
 
+
     public function Logout()
     {
+        // Call logout API
+        $this->api_client->post('logout');
+
+        // Clear session data
         $this->session->unset_userdata('username');
         $this->session->unset_userdata('userId');
         $this->session->unset_userdata('email');
+        $this->session->unset_userdata('has_access_token');
         $this->session->sess_destroy();
 
-        delete_cookie('jwt_token');
+        redirect('AuthController', 'refresh');
+    }
+
+    public function logoutAllDevices()
+    {
+        // Call logout all API
+        $this->api_client->post('logout-all');
+
+        // Clear session data
+        $this->session->unset_userdata('username');
+        $this->session->unset_userdata('userId');
+        $this->session->unset_userdata('email');
+        $this->session->unset_userdata('has_access_token');
+        $this->session->sess_destroy();
 
         redirect('AuthController', 'refresh');
     }
