@@ -545,5 +545,5 @@ $config['proxy_ips'] = '';
 
 
 
-$config['server_origin'] = "http://127.0.0.1:7360";
+$config['server_origin'] = "10.10.15.140:7360";
 
