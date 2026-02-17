@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser ,getAllUsersForChat,getAllUsers,updateUserStatus, updateUserProfile, getUserById, forgotPassword, resetPassword, verifyResetToken} from '../controllers/userController.js';
+import { registerUser, loginUser , logoutUser, logoutAllDevices , getAllUsersForChat,getAllUsers, getActiveSessions, updateUserStatus, revokeUserSession , updateUserProfile, getUserById, forgotPassword, resetPassword, verifyResetToken, refreshAccessToken } from '../controllers/userController.js';
 import { getOrCreateAiConversation } from '../controllers/aiController.js';
 import {
   authenticateToken,

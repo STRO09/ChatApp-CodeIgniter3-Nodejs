@@ -11,13 +11,13 @@ import {
   rotateRefreshToken,
   getUserActiveSessions,
   revokeSession,
-} from "../utils/tokenUtils.js";
+} from "../utils/TokenUtil.js";
 import {
   ErrorCodes,
   throwError,
   successResponse,
   asyncHandler,
-} from "../helpers/ErrorHandler.js";
+} from "../utils/ErrorHandler.js";
 
 // Email transporter configuration
 const transporter = nodemailer.createTransport({
@@ -520,3 +520,15 @@ export const updateUserStatus = async (req, res) => {
     res.status(500).json({ error: "Error updating user status" });
   }
 };
+
+
+export const getUserById = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await User.findById(userId).select("username email");
+  if (!user) {
+    throwError(ErrorCodes.USER_NOT_FOUND);
+  }
+
+  res.json(successResponse({ user }));
+});

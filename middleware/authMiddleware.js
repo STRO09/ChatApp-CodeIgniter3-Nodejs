@@ -1,5 +1,5 @@
-import { verifyAccessToken } from "../utils/tokenUtils.js";
-import { ErrorCodes, createAuthError } from "../utils/errorHandler.js";
+import { verifyAccessToken } from "../utils/TokenUtil.js";
+import { ErrorCodes } from "../utils/ErrorHandler.js";
 import User from "../models/User.js";
 
 /**

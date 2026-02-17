@@ -1,11 +1,12 @@
 import express from 'express';
 import cors from 'cors';
-import connectDB from './config/dbConnection.js';
+import connectDB, {closeConnection} from './config/dbConnection.js';
 import { initSocket } from './sockets/socket.js';
 import cookieParser from "cookie-parser";
 import userRoutes from "./routes/userRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
 import messageRoutes from "./routes/MessageRoutes.js";
+import { errorHandler} from "./utils/ErrorHandler.js";
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -54,7 +55,7 @@ app.use('/api', userRoutes);
 app.use('/api', conversationRoutes);
 app.use('/api', messageRoutes);
 
-app.use("*", (req, res) => {
+app.use("/", (req, res) => {
   res.status(404).json({
     success: false,
     error: {
@@ -95,12 +96,12 @@ server.listen(PORT, () => {
 // Graceful Shutdown
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully...");
-  await mongoose.connection.close();
+  closeConnection(false);
   process.exit(0);
 });
 
 process.on("SIGINT", async () => {
   console.log("SIGINT received, shutting down gracefully...");
-  await mongoose.connection.close();
+  closeConnection(true);
   process.exit(0);
 });
