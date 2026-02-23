@@ -24,9 +24,13 @@ export const initSocket = (server) => {
 
     // Handle user authentication
     socket.on('authenticate', (userData) => {
-      const { userId, username } = userData;
-      
+      const { userId, username, isBot } = userData;
       // Store user with userId as key
+
+        if (isBot) {
+    console.log(`Ignored bot authentication for ${username || userId}`);
+    return;
+  }
       connectedUsers.set(userId, {
         userId,
         username,

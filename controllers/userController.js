@@ -50,29 +50,29 @@ const generateSessionId = () => {
 /**
  * Helper to set refresh token cookie
  */
-const setRefreshTokenCookie = (res, refreshToken) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // HTTPS only in production
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: "/",
-  };
+// const setRefreshTokenCookie = (res, refreshToken) => {
+//   const cookieOptions = {
+//     httpOnly: true,
+//     secure: process.env.NODE_ENV === "production", // HTTPS only in production
+//     sameSite: "strict",
+//     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+//     path: "/",
+//   };
 
-  res.cookie("refreshToken", refreshToken, cookieOptions);
-};
+//   res.cookie("refreshToken", refreshToken, cookieOptions);
+// };
 
-/**
- * Helper to clear refresh token cookie
- */
-const clearRefreshTokenCookie = (res) => {
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-  });
-};
+// /**
+//  * Helper to clear refresh token cookie
+//  */
+// const clearRefreshTokenCookie = (res) => {
+//   res.clearCookie("refreshToken", {
+//     httpOnly: true,
+//     secure: process.env.NODE_ENV === "production",
+//     sameSite: "strict",
+//     path: "/",
+//   });
+// };
 
 
 export const registerUser = asyncHandler(async (req, res) => {
@@ -131,16 +131,16 @@ export const registerUser = asyncHandler(async (req, res) => {
  * Login User
  */
 export const loginUser = asyncHandler(async (req, res) => {
-  const { username, password } = req.body;
+  const { uid, password } = req.body;
 
-  if (!username || !password) {
+  if (!uid || !password) {
     throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
-      fields: ["username", "password"],
+      fields: ["userid", "password"],
     });
   }
 
   const user = await User.findOne({
-    $or: [{ username }, { email: username }],
+    $or: [{ username : uid }, { email: uid }],
   });
 
   if (!user) {
@@ -163,17 +163,17 @@ export const loginUser = asyncHandler(async (req, res) => {
       userAgent
     );
 
-  setRefreshTokenCookie(res, refreshToken);
-
   res.json(
     successResponse(
       {
         accessToken,
+        refreshToken,
         expiresIn,
         user: {
           id: user._id,
           username: user.username,
           email: user.email,
+          isBot: user.isBot
         },
       },
       "Login successful"

@@ -1,5 +1,5 @@
 import { verifyAccessToken } from "../utils/TokenUtil.js";
-import { ErrorCodes } from "../utils/ErrorHandler.js";
+import { ErrorCodes, throwError } from "../utils/ErrorHandler.js";
 import User from "../models/User.js";
 
 /**
@@ -12,7 +12,7 @@ export const authenticateToken = async (req, res, next) => {
     const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
 
     if (!token) {
-      throw createAuthError(ErrorCodes.AUTH_TOKEN_MISSING);
+      throwError(ErrorCodes.AUTH_TOKEN_MISSING);
     }
 
     // Verify token
