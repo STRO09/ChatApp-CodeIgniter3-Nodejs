@@ -6,8 +6,8 @@ class AuthController extends CI_Controller
     public function __construct()
     {
         parent::__construct();
-        $this->load->helper(["url", "cookie", "jwt"]);
-        $this->load->library('form_validation');
+        $this->load->helper(["url", "cookie"]);
+        $this->load->library(['form_validation', 'api_client']);
     }
 
     public function index()
@@ -33,14 +33,13 @@ class AuthController extends CI_Controller
             return;
         }
 
-        $postData = [
-            "username" => $this->input->post("uname"),
-            "email" => $this->input->post("email"),
-            "password" => $this->input->post("password"),
-        ];
-
-        // Make API request
-        $response = $this->api_client->post('register', $postData);
+        // Make API request using the library method
+        $response = $this->api_client->register(
+            $this->input->post("uname"),
+            $this->input->post("email"),
+            $this->input->post("password")
+        );
+        
         $result = $this->api_client->handleResponse($response);
 
         if (!$result['success']) {
@@ -62,13 +61,12 @@ class AuthController extends CI_Controller
 
     public function loginUser()
     {
-        $postData = [
-            "username" => $this->input->post("uname"),
-            "password" => $this->input->post("password"),
-        ];
-
-        // Make API request
-        $response = $this->api_client->post('login', $postData);
+        // Make API request using the library method
+        $response = $this->api_client->login(
+            $this->input->post("uname"),
+            $this->input->post("password")
+        );
+        
         $result = $this->api_client->handleResponse($response);
 
         if (!$result['success']) {
@@ -81,23 +79,20 @@ class AuthController extends CI_Controller
             return;
         }
 
-        // Store user data in session
-        if (isset($result['data']['user'])) {
-            $user = $result['data']['user'];
-            $this->session->set_userdata("username", $user['username']);
-            $this->session->set_userdata("userId", $user['id']);
-            $this->session->set_userdata("email", $user['email']);
-        }
+        // Store ONLY user info in session (for PHP template usage)
+        // if (isset($result['data']['user'])) {
+        //     $user = $result['data']['user'];
+        //     $this->session->set_userdata("username", $user['username']);
+        //     $this->session->set_userdata("userId", $user['id']);
+        //     $this->session->set_userdata("email", $user['email']);
+        // }
 
-        // Store access token info for client-side
-        if (isset($result['data']['accessToken'])) {
-            $this->session->set_userdata("has_access_token", true);
-            // Note: The actual token will be stored in localStorage on client side
-            // We just set a flag here to indicate the user is authenticated
-        }
-
-        redirect("DashboardController");
+        // Pass JWT to a view that will store it in localStorage via JavaScript
+        // Then redirect to dashboard
+        $data['tokenData'] = $result['data'];
+        $this->load->view("LoginSuccess", $data);
     }
+
     public function forgotPassword()
     {
         $this->load->view("ForgotPassword");
@@ -113,8 +108,7 @@ class AuthController extends CI_Controller
             return;
         }
 
-        $postData = ["email" => $email];
-        $response = $this->api_client->post('forgot-password', $postData);
+        $response = $this->api_client->forgotPassword($email);
         $result = $this->api_client->handleResponse($response);
 
         if (!$result['success']) {
@@ -142,9 +136,8 @@ class AuthController extends CI_Controller
             return;
         }
 
-        
         // Verify token with backend
-        $response = $this->api_client->get("verify-reset-token/{$token}");
+        $response = $this->api_client->verifyResetToken($token);
         $result = $this->api_client->handleResponse($response);
 
         if (!isset($result["valid"]) || !$result["valid"]) {
@@ -156,7 +149,6 @@ class AuthController extends CI_Controller
         $data["token"] = $token;
         $this->load->view("ResetPassword", $data);
     }
-
 
     public function processResetPassword()
     {
@@ -178,13 +170,7 @@ class AuthController extends CI_Controller
             return;
         }
 
-
-        $postData = [
-            "token" => $token,
-            "newPassword" => $password
-        ];
-
-        $response = $this->api_client->post('reset-password', $postData);
+        $response = $this->api_client->resetPassword($token, $password);
         $result = $this->api_client->handleResponse($response);
 
         if (!$result['success']) {
@@ -205,17 +191,15 @@ class AuthController extends CI_Controller
         redirect("AuthController", "refresh");
     }
 
-
     public function Logout()
     {
-        // Call logout API
-        $this->api_client->post('logout');
+        // Call logout API (optional - can be done client-side)
+        $this->api_client->logout();
 
         // Clear session data
         $this->session->unset_userdata('username');
         $this->session->unset_userdata('userId');
         $this->session->unset_userdata('email');
-        $this->session->unset_userdata('has_access_token');
         $this->session->sess_destroy();
 
         redirect('AuthController', 'refresh');
@@ -224,13 +208,12 @@ class AuthController extends CI_Controller
     public function logoutAllDevices()
     {
         // Call logout all API
-        $this->api_client->post('logout-all');
+        $this->api_client->logoutAllDevices();
 
         // Clear session data
         $this->session->unset_userdata('username');
         $this->session->unset_userdata('userId');
         $this->session->unset_userdata('email');
-        $this->session->unset_userdata('has_access_token');
         $this->session->sess_destroy();
 
         redirect('AuthController', 'refresh');

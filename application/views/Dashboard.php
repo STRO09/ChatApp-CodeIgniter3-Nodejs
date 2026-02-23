@@ -12,8 +12,64 @@
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <?php $serverorigin = $this->config->item('server_origin'); ?>
-
 </head>
+
+  <script>
+    function decodeJWT(token) {
+      const payload = token.split(".")[1];
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const json = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(json);
+    }
+
+    const jwt = localStorage.getItem("access_token");
+
+    if (!jwt) {
+      window.location.href = "<?= site_url('AuthController') ?>";
+    }
+
+    const decodedjwt = decodeJWT(jwt);
+
+    // ---------------------------------------------------------------
+    // Pull identity from JWT claims.
+    // Adjust the claim keys below to match your actual token payload
+    // (e.g. decodedjwt.sub, decodedjwt.user_id, decodedjwt.name …)
+    // ---------------------------------------------------------------
+    const myUsername = decodedjwt.username;
+    const myUserId   = decodedjwt.id;
+
+    window.APP = {
+      myRealUsername: myUsername,
+      myRealId:       myUserId,
+      serverorigin:   <?= json_encode($serverorigin) ?>   // server config – still requires PHP
+    };
+
+    // Populate all identity-dependent DOM nodes as soon as the
+    // document is ready (avoids a flash of empty / wrong content).
+    document.addEventListener("DOMContentLoaded", () => {
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(myUsername)}&background=5b21b6&color=fff&bold=true`;
+
+      // Sidebar avatar + name
+      document.getElementById("my-avatar").src        = avatarUrl;
+      document.getElementById("my-username").textContent = myUsername;
+
+      // Welcome screen
+      document.getElementById("welcome-heading").textContent = `Welcome ${myUsername} 👋`;
+
+      // Profile modal
+      document.getElementById("profile-view-avatar").src          = avatarUrl;
+      document.getElementById("profile-view-username").textContent = myUsername;
+      document.getElementById("profile-view-userid").textContent   = myUserId;
+
+      // Edit profile modal – pre-fill username input
+      document.getElementById("edit-username").value = myUsername;
+    });
+  </script>
 
 <body>
   <div class="chat-app">
@@ -23,13 +79,13 @@
 
         <div class="current-user-info">
           <div class="user-avatar" id="my-avatar-container">
-            <img
-              src="https://ui-avatars.com/api/?name=<?php echo urlencode($username); ?>&background=5b21b6&color=fff&bold=true"
-              alt="Profile" id="my-avatar">
+            <!-- src set by JS after JWT decode -->
+            <img src="" alt="Profile" id="my-avatar">
             <div class="user-status online" id="my-status"></div>
           </div>
           <div class="user-details">
-            <h3 id="my-username"><?php echo htmlspecialchars($username); ?></h3>
+            <!-- text set by JS after JWT decode -->
+            <h3 id="my-username"></h3>
             <p id="my-user-id">Connecting...</p>
           </div>
         </div>
@@ -93,12 +149,13 @@
         <div class="welcome-icon">
           <i class="fas fa-comments"></i>
         </div>
-        <h2>Welcome <?php echo htmlspecialchars($username); ?> 👋</h2>
+        <!-- text set by JS after JWT decode -->
+        <h2 id="welcome-heading">Welcome 👋</h2>
         <p>Select a conversation from the sidebar to start chatting. You can message individual users or create group
           chats.</p>
       </div>
 
-      <div class="chat-header-area" id="chat-header" style="display: none;cursor: pointer;">
+      <div class="chat-header-area" id="chat-header" style="display: none; cursor: pointer;">
         <div class="chat-header-avatar">
           <img src="https://ui-avatars.com/api/?name=User&background=94a3b8&color=fff" alt="Profile"
             id="current-user-avatar">
@@ -108,12 +165,9 @@
           <p id="current-chat-status">Select a user to start chatting</p>
           <div class="typing-indicator" id="typing-indicator" style="display: none;"></div>
         </div>
-
       </div>
 
-      <div class="messages-container" id="chat-messages" style="display: none;">
-
-      </div>
+      <div class="messages-container" id="chat-messages" style="display: none;"></div>
 
       <div class="chat-input-area" id="chat-input-area" style="display: none;">
         <div class="file-attachment">
@@ -123,7 +177,6 @@
           </button>
         </div>
         <span id="file-name" class="file-name"></span>
-
         <input type="text" class="message-input" id="message-input" placeholder="Type your message here..." disabled>
         <button class="send-button" id="send-button" disabled>
           <i class="fas fa-paper-plane"></i>
@@ -144,9 +197,7 @@
         <div class="selected-users" id="selected-users-list">
           <div class="hint">No users selected yet</div>
         </div>
-        <div class="users-list" id="available-users-list">
-
-        </div>
+        <div class="users-list" id="available-users-list"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" id="cancel-group">Cancel</button>
@@ -155,36 +206,33 @@
     </div>
   </div>
 
-
   <!-- Profile Modal (View Only) -->
   <div class="profile-modal" id="profile-modal">
     <div class="profile-modal-content">
       <div class="profile-modal-header">
         <h3>My Profile</h3>
       </div>
-
       <div class="profile-modal-body">
         <div class="profile-avatar">
-          <img
-            src="https://ui-avatars.com/api/?name=<?php echo urlencode($username); ?>&background=5b21b6&color=fff&bold=true"
-            alt="Profile" id="profile-view-avatar">
+          <!-- src set by JS after JWT decode -->
+          <img src="" alt="Profile" id="profile-view-avatar">
         </div>
-
         <div class="profile-info">
           <div class="profile-field">
             <label><i class="fas fa-user"></i> Username</label>
-            <span id="profile-view-username"><?php echo htmlspecialchars($username); ?></span>
+            <!-- text set by JS after JWT decode -->
+            <span id="profile-view-username"></span>
           </div>
           <div class="profile-field">
             <label><i class="fas fa-id-card"></i> User ID</label>
-            <span id="profile-view-userid"><?php echo htmlspecialchars($userId); ?></span>
+            <!-- text set by JS after JWT decode -->
+            <span id="profile-view-userid"></span>
           </div>
           <div class="profile-field">
             <label><i class="fas fa-circle"></i> Status</label>
             <span id="profile-view-status">Online</span>
           </div>
         </div>
-
         <div class="profile-modal-footer">
           <button class="profile-btn" id="profile-close">
             <i class="fas fa-times"></i> Close
@@ -203,14 +251,12 @@
       <div class="edit-modal-header">
         <h3>Edit Profile</h3>
       </div>
-
       <div class="edit-modal-body">
         <div class="edit-form-group">
           <label><i class="fas fa-user"></i> Username</label>
-          <input type="text" class="edit-form-input" id="edit-username"
-            value="<?php echo htmlspecialchars($username); ?>">
+          <!-- value set by JS after JWT decode -->
+          <input type="text" class="edit-form-input" id="edit-username" value="">
         </div>
-
         <div class="edit-form-group">
           <label><i class="fas fa-lock"></i> Current Password</label>
           <input type="password" class="edit-form-input" id="edit-current-password"
@@ -220,7 +266,6 @@
             Required for any changes to your account
           </div>
         </div>
-
         <div class="edit-form-group">
           <label><i class="fas fa-key"></i> New Password (Optional)</label>
           <input type="password" class="edit-form-input" id="edit-new-password" placeholder="Enter new password">
@@ -229,12 +274,10 @@
             Leave empty to keep your current password
           </div>
         </div>
-
         <div class="edit-form-group">
           <label><i class="fas fa-check-circle"></i> Confirm New Password</label>
           <input type="password" class="edit-form-input" id="edit-confirm-password" placeholder="Confirm new password">
         </div>
-
         <div class="edit-modal-footer">
           <button class="edit-btn" id="edit-cancel">
             <i class="fas fa-times"></i> Cancel
@@ -247,19 +290,7 @@
     </div>
   </div>
 
-  <script>
-    window.APP = {
-      // Get username from PHP
-      myRealUsername: <?php echo json_encode($username); ?>,
-      myRealId: <?php echo json_encode($userId); ?>,
-
-      // Socket.IO connection
-      serverorigin: <?= json_encode($serverorigin) ?>
-    }
-
-  </script>
   <script src="<?php echo base_url('assets/js/dashboardfunctions.js') ?>"></script>
-
 
 </body>
 

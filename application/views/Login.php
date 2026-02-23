@@ -24,13 +24,17 @@
   <?php endif; ?>
 
   <div>
-    <form class="form" id="loginForm">
+    <form class="form" method="post" action="<?= site_url('AuthController/loginUser') ?>" id="loginForm">
       <div class="flex-column">
         <h2>Welcome Back</h2>
       </div>
 
-      <!-- Error message container -->
-      <div id="errorMessage" class="error-msg" style="display: none;"></div>
+      <!-- Server-side error message -->
+      <?php if (isset($error)): ?>
+        <div class="error-msg">
+          <?php echo $error; ?>
+        </div>
+      <?php endif; ?>
 
       <!-- Username/Email Field -->
       <div class="flex-column">
@@ -121,53 +125,6 @@
         eyeOpen.style.display = 'none';
       }
     }
-  </script>
-  <script src="<?php echo base_url("assets/js/token-manager.js") ?>"></script>
-  <script>
-    // Handle login form submission
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-
-      const submitBtn = document.getElementById('submitBtn');
-      const errorMessage = document.getElementById('errorMessage');
-      const originalBtnContent = submitBtn.innerHTML;
-
-      // Disable button and show loading
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span>Signing in...</span>';
-      errorMessage.style.display = 'none';
-
-      try {
-        const username = document.getElementById('uname').value;
-        const password = document.getElementById('password').value;
-
-        const response = await apiClient.post('login', {
-          username,
-          password
-        });
-
-        if (response.success && response.data.accessToken) {
-          // Store access token
-          apiClient.handleLoginResponse(response);
-
-          // Redirect to dashboard
-          window.location.href = '<?= site_url('DashboardController') ?>';
-        } else {
-          // Show error
-          const error = response.error?.message || 'Login failed';
-          errorMessage.textContent = error;
-          errorMessage.style.display = 'block';
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = originalBtnContent;
-        }
-      } catch (error) {
-        console.error('Login error:', error);
-        errorMessage.textContent = 'Server unreachable. Please try again later.';
-        errorMessage.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnContent;
-      }
-    });
   </script>
 </body>
 

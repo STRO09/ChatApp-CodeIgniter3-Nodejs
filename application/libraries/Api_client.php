@@ -16,7 +16,7 @@ class Api_client
     }
 
     // ─────────────────────────────────────────
-    // PUBLIC AUTH ENDPOINTS
+    // PUBLIC AUTH ENDPOINTS (NO AUTH REQUIRED)
     // ─────────────────────────────────────────
 
     public function register($username, $email, $password)
@@ -55,7 +55,9 @@ class Api_client
     }
 
     // ─────────────────────────────────────────
-    // PROTECTED AUTH ENDPOINTS
+    // PROTECTED ENDPOINTS (REQUIRE AUTH)
+    // Note: These should typically be called from JavaScript with JWT,
+    // but can be used server-side if needed (will use refresh token cookie)
     // ─────────────────────────────────────────
 
     public function logout()
@@ -68,10 +70,6 @@ class Api_client
         return $this->post('/api/logout-all');
     }
 
-    // ─────────────────────────────────────────
-    // SESSION ENDPOINTS
-    // ─────────────────────────────────────────
-
     public function getSessions()
     {
         return $this->get('/api/sessions');
@@ -81,10 +79,6 @@ class Api_client
     {
         return $this->delete("/api/sessions/{$sessionId}");
     }
-
-    // ─────────────────────────────────────────
-    // USER ENDPOINTS
-    // ─────────────────────────────────────────
 
     public function getUserById($userId)
     {
@@ -118,10 +112,6 @@ class Api_client
         ));
     }
 
-    // ─────────────────────────────────────────
-    // AI ENDPOINT
-    // ─────────────────────────────────────────
-
     public function getOrCreateAiConversation($payload)
     {
         return $this->post('/api/ai/conversation', $payload);
@@ -131,10 +121,6 @@ class Api_client
     // RESPONSE HANDLER
     // ─────────────────────────────────────────
 
-    /**
-     * Decode and normalise a raw curl response.
-     * Returns an array with at least ['success' => bool, 'error' => [...]] shape.
-     */
     public function handleResponse($response)
     {
         if ($response === false) {
@@ -154,7 +140,7 @@ class Api_client
     // INTERNAL HTTP HELPERS
     // ─────────────────────────────────────────
 
-    public function get($path, $params = [])
+    private function get($path, $params = [])
     {
         $url = $this->base_url . $path;
         if (!empty($params)) {
@@ -163,17 +149,17 @@ class Api_client
         return $this->makeRequest($url, 'GET');
     }
 
-    public function post($path, $data = [])
+    private function post($path, $data = [])
     {
         return $this->makeRequest($this->base_url . $path, 'POST', $data);
     }
 
-    public function put($path, $data = [])
+    private function put($path, $data = [])
     {
         return $this->makeRequest($this->base_url . $path, 'PUT', $data);
     }
 
-    public function delete($path)
+    private function delete($path)
     {
         return $this->makeRequest($this->base_url . $path, 'DELETE');
     }
@@ -182,7 +168,7 @@ class Api_client
     // CORE REQUEST + RETRY ENGINE
     // ─────────────────────────────────────────
 
-    public function makeRequest($url, $method, $data = null, $attempt = 0)
+    private function makeRequest($url, $method, $data = null, $attempt = 0)
     {
         $ch = curl_init();
 
@@ -191,18 +177,15 @@ class Api_client
             'Accept: application/json',
         ];
 
-        $token = $this->getAccessToken();
-        if ($token) {
-            $headers[] = "Authorization: Bearer {$token}";
-        }
+        // For server-side requests, we rely on the refresh token cookie
+        // The JWT is in localStorage (client-side only)
 
         curl_setopt_array($ch, [
             CURLOPT_URL            => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $this->timeout,
             CURLOPT_HTTPHEADER     => $headers,
-            // Shared cookie jar so the httpOnly refresh-token cookie travels
-            // with every server-side request automatically.
+            // Shared cookie jar - refresh token cookie travels automatically
             CURLOPT_COOKIEJAR      => APPPATH . 'cache/cookies.txt',
             CURLOPT_COOKIEFILE     => APPPATH . 'cache/cookies.txt',
         ]);
@@ -235,7 +218,7 @@ class Api_client
         // ── Network / 5xx → exponential backoff retry ──────────────────────
         if ($curlError || $httpCode >= 500) {
             if ($attempt < $this->max_retries) {
-                $delay = $this->retry_delay * pow(2, $attempt); // 1 s, 2 s, 4 s
+                $delay = $this->retry_delay * pow(2, $attempt);
                 log_message('info', "API retry {$attempt} → {$url} (delay {$delay}ms)");
                 usleep($delay * 1000);
                 return $this->makeRequest($url, $method, $data, $attempt + 1);
@@ -245,80 +228,14 @@ class Api_client
             return false;
         }
 
-        // ── 401 → try one token refresh then replay ─────────────────────────
-        if ($httpCode === 401 && $attempt === 0) {
-            $body = json_decode($response, true);
-            // Only refresh when the backend explicitly says access token is
-            // expired (code 1002). Other 401s (bad creds, revoked session,
-            // etc.) fall through so the caller can surface the real error.
-            if (isset($body['error']['code']) && $body['error']['code'] === 1002) {
-                if ($this->refreshToken()) {
-                    return $this->makeRequest($url, $method, $data, $attempt + 1);
-                }
-                // refreshToken() already redirected to login on failure.
-            }
-        }
-
         return $response;
-    }
-
-    // ─────────────────────────────────────────
-    // TOKEN HELPERS
-    // ─────────────────────────────────────────
-
-    /**
-     * The PHP layer never owns the JWT long-term (that lives in the browser's
-     * localStorage). After login the controller stores it in the session so
-     * server-side protected calls can forward it as a Bearer token.
-     */
-    public function getAccessToken()
-    {
-        return $this->CI->session->userdata('access_token') ?: null;
-    }
-
-    /**
-     * Hit POST /api/refresh. The httpOnly refresh-token cookie is forwarded
-     * automatically via the shared cookie jar. On success the new JWT is
-     * persisted in the session for the rest of this request cycle.
-     */
-    private function refreshToken()
-    {
-        $url = $this->base_url . '/api/refresh';
-
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
-            CURLOPT_COOKIEJAR      => APPPATH . 'cache/cookies.txt',
-            CURLOPT_COOKIEFILE     => APPPATH . 'cache/cookies.txt',
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode === 200) {
-            $data = json_decode($response, true);
-            if (!empty($data['success']) && !empty($data['data']['accessToken'])) {
-                $this->CI->session->set_userdata('access_token', $data['data']['accessToken']);
-                log_message('info', 'Access token refreshed successfully.');
-                return true;
-            }
-        }
-
-        log_message('error', "Token refresh failed (HTTP {$httpCode}) — redirecting to login.");
-        redirect('AuthController', 'refresh');
-        return false;
     }
 
     // ─────────────────────────────────────────
     // INTERNAL UTILITIES
     // ─────────────────────────────────────────
 
-    public function errorPayload($message)
+    private function errorPayload($message)
     {
         return [
             'success' => false,
