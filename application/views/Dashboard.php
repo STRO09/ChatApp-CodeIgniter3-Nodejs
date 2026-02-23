@@ -42,11 +42,12 @@
     // ---------------------------------------------------------------
     const myUsername = decodedjwt.username;
     const myUserId   = decodedjwt.id;
-
+    const isBot = decodedjwt.isBot;
     window.APP = {
       myRealUsername: myUsername,
       myRealId:       myUserId,
-      serverorigin:   <?= json_encode($serverorigin) ?>   // server config – still requires PHP
+      isBot : isBot,
+      serverorigin:   <?= json_encode($serverorigin) ?>  // server config – still requires PHP
     };
 
     // Populate all identity-dependent DOM nodes as soon as the

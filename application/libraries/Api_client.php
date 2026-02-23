@@ -28,10 +28,10 @@ class Api_client
         ]);
     }
 
-    public function login($username, $password)
+    public function login($uid, $password)
     {
         return $this->post('/api/login', [
-            'username' => $username,
+            'uid' => $uid,
             'password' => $password,
         ]);
     }

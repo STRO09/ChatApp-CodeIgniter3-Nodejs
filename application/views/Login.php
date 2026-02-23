@@ -31,7 +31,7 @@
 
       <!-- Server-side error message -->
       <?php if (isset($error)): ?>
-        <div class="error-msg">
+        <div class="error">
           <?php echo $error; ?>
         </div>
       <?php endif; ?>
@@ -48,7 +48,7 @@
             </path>
           </g>
         </svg>
-        <input placeholder="Enter your username or email" class="input" type="text" name="uname" id="uname"
+        <input placeholder="Enter your username or email" class="input" type="text" name="uid" id="uid"
           autocomplete="username" required>
       </div>
 

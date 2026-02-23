@@ -63,7 +63,7 @@ class AuthController extends CI_Controller
     {
         // Make API request using the library method
         $response = $this->api_client->login(
-            $this->input->post("uname"),
+            $this->input->post("uid"),
             $this->input->post("password")
         );
         
