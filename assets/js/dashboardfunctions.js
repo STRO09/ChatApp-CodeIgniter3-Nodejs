@@ -5,6 +5,7 @@ const APP_CONFIG = {
 	serverOrigin: APP.serverorigin,
 	myUserId: APP.myRealId,
 	myUsername: APP.myRealUsername,
+	isBot : APP.isBot
 };
 
 // ============================================================================
@@ -136,6 +137,7 @@ function initApp() {
 	socket.emit("authenticate", {
 		userId: myUserData.id,
 		username: myUserData.username,
+		isBot : myUserData.isBot
 	});
 
 	// Load initial data
@@ -636,6 +638,7 @@ function renderRecentChats() {
 		);
 
 		if (!otherParticipant) return false;
+		if(otherParticipant.isBot) return false;
 
 		// Only show if user is OFFLINE
 		const isOnline = onlineUserIds.has(otherParticipant._id);

@@ -43,16 +43,22 @@
   <?php endif; ?>
 
   <div>
+<<<<<<< HEAD
     <form class="form" id="loginForm" action="<?= site_url('AuthController/loginUser') ?>" method="post">
+=======
+    <form class="form" method="post" action="<?= site_url('AuthController/loginUser') ?>" id="loginForm">
+>>>>>>> 1db6d40ff83d49d8a564e1899ea9dc96064c917b
       <div class="flex-column">
         <h2>Welcome Back</h2>
       </div>
 
-      <!-- Error message container -->
+
+      <!-- Server-side error message -->
       <?php if (isset($error)): ?>
-        <div class="error-msg" style="display: block;"><?php echo $error; ?></div>
-      <?php else: ?>
-        <div id="errorMessage" class="error-msg" style="display: none;"></div>
+        <div class="error">
+          <?php echo $error; ?>
+        </div>
+
       <?php endif; ?>
 
       <!-- Username/Email Field -->
@@ -67,7 +73,7 @@
             </path>
           </g>
         </svg>
-        <input placeholder="Enter your username or email" class="input" type="text" name="uname" id="uname"
+        <input placeholder="Enter your username or email" class="input" type="text" name="uid" id="uid"
           autocomplete="username" required>
       </div>
 
@@ -146,6 +152,7 @@
     }
   </script>
   <script src="<?php echo base_url("assets/js/token-manager.js") ?>"></script>
+
 </body>
 
 </html>

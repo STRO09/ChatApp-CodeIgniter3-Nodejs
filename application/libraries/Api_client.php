@@ -1,246 +1,245 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-/**
- * API Client Library with Retry Logic and Token Management
- */
 class Api_client
 {
     protected $CI;
     protected $base_url;
-    protected $api_version = 'v1';
     protected $max_retries = 3;
-    protected $retry_delay = 1000; // milliseconds
+    protected $retry_delay = 1000; // ms base delay for exponential backoff
     protected $timeout = 30;
 
     public function __construct()
     {
         $this->CI = &get_instance();
-        $this->CI->load->helper('cookie');
-        $this->base_url = $this->CI->config->item('server_origin');
+        $this->base_url = rtrim($this->CI->config->item('server_origin'), '/');
     }
 
-    /**
-     * Build full API URL
-     */
-    private function buildUrl($endpoint)
+    // ─────────────────────────────────────────
+    // PUBLIC AUTH ENDPOINTS (NO AUTH REQUIRED)
+    // ─────────────────────────────────────────
+
+    public function register($username, $email, $password)
     {
-        $endpoint = ltrim($endpoint, '/');
-        return "{$this->base_url}/api/{$this->api_version}/{$endpoint}";
-    }
-
-    /**
-     * Get access token from localStorage (sent from frontend)
-     * In practice, this should be sent in headers from the frontend
-     */
-    private function getAccessToken()
-    {
-        // For server-side requests, you might need to pass token differently
-        // This is a placeholder - actual implementation depends on your architecture
-        return null;
-    }
-
-    /**
-     * Make HTTP request with retry logic
-     */
-    private function makeRequest($url, $method = 'GET', $data = null, $retryCount = 0)
-    {
-        $ch = curl_init();
-
-        // Build headers
-        $headers = [
-            'Content-Type: application/json',
-            'Accept: application/json'
-        ];
-
-        // Add authorization header if token exists
-        $token = $this->getAccessToken();
-        if ($token) {
-            $headers[] = "Authorization: Bearer {$token}";
-        }
-
-        // Configure CURL
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, APPPATH . 'cache/cookies.txt');
-        curl_setopt($ch, CURLOPT_COOKIEFILE, APPPATH . 'cache/cookies.txt');
-
-        // Set method and data
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, true);
-            if ($data) {
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            }
-        } elseif ($method === 'PUT') {
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-            if ($data) {
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            }
-        } elseif ($method === 'DELETE') {
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-        }
-
-        // Execute request
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        // Handle errors with retry logic
-        if ($error || $httpCode >= 500) {
-            if ($retryCount < $this->max_retries) {
-                // Exponential backoff
-                $delay = $this->retry_delay * pow(2, $retryCount);
-                usleep($delay * 1000); // Convert to microseconds
-                
-                log_message('info', "Retrying request (attempt " . ($retryCount + 1) . "): {$url}");
-                return $this->makeRequest($url, $method, $data, $retryCount + 1);
-            }
-            
-            log_message('error', "Request failed after {$this->max_retries} retries: {$url}");
-            return false;
-        }
-
-        // Handle token expiration (401)
-        if ($httpCode === 401 && $retryCount === 0) {
-            $responseData = json_decode($response, true);
-            
-            // Check if it's a token expiration error
-            if (isset($responseData['error']['code']) && $responseData['error']['code'] === 1002) {
-                // Try to refresh token
-                if ($this->refreshToken()) {
-                    // Retry original request with new token
-                    return $this->makeRequest($url, $method, $data, $retryCount + 1);
-                }
-            }
-        }
-
-        return $response;
-    }
-
-    /**
-     * Refresh access token
-     */
-    private function refreshToken()
-    {
-        $url = $this->buildUrl('refresh');
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'Accept: application/json'
+        return $this->post('/api/register', [
+            'username' => $username,
+            'email'    => $email,
+            'password' => $password,
         ]);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, APPPATH . 'cache/cookies.txt');
-        curl_setopt($ch, CURLOPT_COOKIEFILE, APPPATH . 'cache/cookies.txt');
+    }
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+    public function login($uid, $password)
+    {
+        return $this->post('/api/login', [
+            'uid' => $uid,
+            'password' => $password,
+        ]);
+    }
 
-        if ($httpCode === 200) {
-            $data = json_decode($response, true);
-            
-            if (isset($data['success']) && $data['success'] && isset($data['data']['accessToken'])) {
-                // Token refreshed successfully
-                // You would need to update the token in your storage mechanism
-                return true;
-            }
+    public function forgotPassword($email)
+    {
+        return $this->post('/api/forgot-password', ['email' => $email]);
+    }
+
+    public function resetPassword($token, $newPassword)
+    {
+        return $this->post('/api/reset-password', [
+            'token'       => $token,
+            'newPassword' => $newPassword,
+        ]);
+    }
+
+    public function verifyResetToken($token)
+    {
+        return $this->get("/api/verify-reset-token/{$token}");
+    }
+
+    // ─────────────────────────────────────────
+    // PROTECTED ENDPOINTS (REQUIRE AUTH)
+    // Note: These should typically be called from JavaScript with JWT,
+    // but can be used server-side if needed (will use refresh token cookie)
+    // ─────────────────────────────────────────
+
+    public function logout()
+    {
+        return $this->post('/api/logout');
+    }
+
+    public function logoutAllDevices()
+    {
+        return $this->post('/api/logout-all');
+    }
+
+    public function getSessions()
+    {
+        return $this->get('/api/sessions');
+    }
+
+    public function revokeSession($sessionId)
+    {
+        return $this->delete("/api/sessions/{$sessionId}");
+    }
+
+    public function getUserById($userId)
+    {
+        return $this->get("/api/user/{$userId}");
+    }
+
+    public function getChatUsers($userId)
+    {
+        return $this->get("/api/users/chat/{$userId}");
+    }
+
+    public function getAllUsers($userId)
+    {
+        return $this->get("/api/users/all/{$userId}");
+    }
+
+    public function updateUserStatus($userId, $status, $isOnline = null)
+    {
+        $payload = ['status' => $status];
+        if ($isOnline !== null) {
+            $payload['isOnline'] = $isOnline;
         }
-
-        // Refresh failed - redirect to login
-        redirect('AuthController', 'refresh');
-        return false;
+        return $this->put("/api/user/{$userId}/status", $payload);
     }
 
-    /**
-     * GET request
-     */
-    public function get($endpoint, $params = [])
+    public function updateProfile($userId, $data)
     {
-        $url = $this->buildUrl($endpoint);
-        
-        if (!empty($params)) {
-            $url .= '?' . http_build_query($params);
-        }
-
-        return $this->makeRequest($url, 'GET');
+        return $this->post('/api/user/update-profile', array_merge(
+            ['userId' => $userId],
+            $data
+        ));
     }
 
-    /**
-     * POST request
-     */
-    public function post($endpoint, $data = [])
+    public function getOrCreateAiConversation($payload)
     {
-        $url = $this->buildUrl($endpoint);
-        return $this->makeRequest($url, 'POST', $data);
+        return $this->post('/api/ai/conversation', $payload);
     }
 
-    /**
-     * PUT request
-     */
-    public function put($endpoint, $data = [])
-    {
-        $url = $this->buildUrl($endpoint);
-        return $this->makeRequest($url, 'PUT', $data);
-    }
+    // ─────────────────────────────────────────
+    // RESPONSE HANDLER
+    // ─────────────────────────────────────────
 
-    /**
-     * DELETE request
-     */
-    public function delete($endpoint)
-    {
-        $url = $this->buildUrl($endpoint);
-        return $this->makeRequest($url, 'DELETE');
-    }
-
-    /**
-     * Handle API response
-     */
     public function handleResponse($response)
     {
         if ($response === false) {
-            return [
-                'success' => false,
-                'error' => [
-                    'message' => 'Server unreachable. Please try again later.'
-                ]
-            ];
+            return $this->errorPayload('Server unreachable. Please try again later.');
         }
 
         $data = json_decode($response, true);
-        
+
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return [
-                'success' => false,
-                'error' => [
-                    'message' => 'Invalid response from server'
-                ]
-            ];
+            return $this->errorPayload('Invalid JSON received from server.');
         }
 
         return $data;
     }
 
-    /**
-     * Set custom retry configuration
-     */
-    public function setRetryConfig($maxRetries, $retryDelay)
+    // ─────────────────────────────────────────
+    // INTERNAL HTTP HELPERS
+    // ─────────────────────────────────────────
+
+    private function get($path, $params = [])
     {
-        $this->max_retries = $maxRetries;
-        $this->retry_delay = $retryDelay;
+        $url = $this->base_url . $path;
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        return $this->makeRequest($url, 'GET');
     }
 
-    /**
-     * Set API version
-     */
-    public function setApiVersion($version)
+    private function post($path, $data = [])
     {
-        $this->api_version = $version;
+        return $this->makeRequest($this->base_url . $path, 'POST', $data);
+    }
+
+    private function put($path, $data = [])
+    {
+        return $this->makeRequest($this->base_url . $path, 'PUT', $data);
+    }
+
+    private function delete($path)
+    {
+        return $this->makeRequest($this->base_url . $path, 'DELETE');
+    }
+
+    // ─────────────────────────────────────────
+    // CORE REQUEST + RETRY ENGINE
+    // ─────────────────────────────────────────
+
+    private function makeRequest($url, $method, $data = null, $attempt = 0)
+    {
+        $ch = curl_init();
+
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ];
+
+        // For server-side requests, we rely on the refresh token cookie
+        // The JWT is in localStorage (client-side only)
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $this->timeout,
+            CURLOPT_HTTPHEADER     => $headers,
+            // Shared cookie jar - refresh token cookie travels automatically
+            CURLOPT_COOKIEJAR      => APPPATH . 'cache/cookies.txt',
+            CURLOPT_COOKIEFILE     => APPPATH . 'cache/cookies.txt',
+        ]);
+
+        switch ($method) {
+            case 'POST':
+                curl_setopt($ch, CURLOPT_POST, true);
+                if ($data !== null) {
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                }
+                break;
+
+            case 'PUT':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+                if ($data !== null) {
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                }
+                break;
+
+            case 'DELETE':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+                break;
+        }
+
+        $response  = curl_exec($ch);
+        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        // ── Network / 5xx → exponential backoff retry ──────────────────────
+        if ($curlError || $httpCode >= 500) {
+            if ($attempt < $this->max_retries) {
+                $delay = $this->retry_delay * pow(2, $attempt);
+                log_message('info', "API retry {$attempt} → {$url} (delay {$delay}ms)");
+                usleep($delay * 1000);
+                return $this->makeRequest($url, $method, $data, $attempt + 1);
+            }
+
+            log_message('error', "API failed after {$this->max_retries} retries: {$url}");
+            return false;
+        }
+
+        return $response;
+    }
+
+    // ─────────────────────────────────────────
+    // INTERNAL UTILITIES
+    // ─────────────────────────────────────────
+
+    private function errorPayload($message)
+    {
+        return [
+            'success' => false,
+            'error'   => ['message' => $message],
+        ];
     }
 }
