@@ -1,5 +1,5 @@
-import { verifyAccessToken } from "../utils/tokenUtils.js";
-import { ErrorCodes, createAuthError } from "../utils/errorHandler.js";
+import { verifyAccessToken } from "../utils/TokenUtil.js";
+import { ErrorCodes, throwError } from "../utils/ErrorHandler.js";
 import User from "../models/User.js";
 
 /**
@@ -12,7 +12,7 @@ export const authenticateToken = async (req, res, next) => {
     const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
 
     if (!token) {
-      throw createAuthError(ErrorCodes.AUTH_TOKEN_MISSING);
+      throwError(ErrorCodes.AUTH_TOKEN_MISSING);
     }
 
     // Verify token
@@ -61,13 +61,13 @@ export const optionalAuth = async (req, res, next) => {
 export const verifyUserExists = async (req, res, next) => {
   try {
     if (!req.user || !req.user.id) {
-      throw createAuthError(ErrorCodes.AUTH_UNAUTHORIZED);
+      throwError(ErrorCodes.AUTH_UNAUTHORIZED);
     }
 
     const user = await User.findById(req.user.id).select("-password");
 
     if (!user) {
-      throw createAuthError(ErrorCodes.USER_NOT_FOUND);
+      throwError(ErrorCodes.USER_NOT_FOUND);
     }
 
     // Attach full user object to request

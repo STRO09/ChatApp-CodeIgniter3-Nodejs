@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import userRoutes from "./routes/userRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
 import messageRoutes from "./routes/MessageRoutes.js";
+import { errorHandler } from './utils/ErrorHandler.js';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -54,7 +55,7 @@ app.use('/api', userRoutes);
 app.use('/api', conversationRoutes);
 app.use('/api', messageRoutes);
 
-app.use("*", (req, res) => {
+app.use("/", (req, res) => {
   res.status(404).json({
     success: false,
     error: {
@@ -85,13 +86,6 @@ const server = createServer(app);
 // Initialize Socket.IO
 initSocket(server);
 
-// Start server
-const PORT = process.env.PORT || 7360;
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
-
-
 // Graceful Shutdown
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully...");
@@ -103,4 +97,10 @@ process.on("SIGINT", async () => {
   console.log("SIGINT received, shutting down gracefully...");
   await mongoose.connection.close();
   process.exit(0);
+});
+
+// Start server
+const PORT = process.env.PORT || 7360;
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });

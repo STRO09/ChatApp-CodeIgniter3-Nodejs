@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import {
@@ -11,13 +10,13 @@ import {
   rotateRefreshToken,
   getUserActiveSessions,
   revokeSession,
-} from "../utils/tokenUtils.js";
+} from "../utils/TokenUtil.js";
 import {
   ErrorCodes,
   throwError,
   successResponse,
   asyncHandler,
-} from "../helpers/ErrorHandler.js";
+} from "../utils/ErrorHandler.js";
 
 // Email transporter configuration
 const transporter = nodemailer.createTransport({
@@ -518,5 +517,16 @@ export const updateUserStatus = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error updating user status" });
+  }
+};
+
+export const getUserById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).select("username email");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Error fetching user" });
   }
 };

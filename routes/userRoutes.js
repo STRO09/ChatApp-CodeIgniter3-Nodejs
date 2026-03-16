@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser ,getAllUsersForChat,getAllUsers,updateUserStatus, updateUserProfile, getUserById, forgotPassword, resetPassword, verifyResetToken} from '../controllers/userController.js';
+import { registerUser, loginUser , refreshAccessToken, logoutUser, logoutAllDevices, getActiveSessions, revokeUserSession, getAllUsersForChat,getAllUsers,updateUserStatus, updateUserProfile, getUserById, forgotPassword, resetPassword, verifyResetToken} from '../controllers/userController.js';
 import { getOrCreateAiConversation } from '../controllers/aiController.js';
 import {
   authenticateToken,
@@ -9,8 +9,8 @@ import {
 
 const router = express.Router();
 
-router.post('/register', registerUser);
-router.post('/login', loginUser);
+router.post('/v1/register', registerUser);
+router.post('/v1/login', loginUser);
 router.post("/refresh", refreshAccessToken);
 
 // Logout
