@@ -4,8 +4,47 @@
  */
 
 // -------------------------------
-// Validation State
+// Input Sanitization & Security
 // -------------------------------
+function sanitizeInput(input) {
+	// Remove potential script tags and other dangerous content
+	return input
+		.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+		.replace(/<[^>]*>/g, "") // Remove HTML tags
+		.replace(/javascript:/gi, "") // Remove javascript: URLs
+		.replace(/on\w+\s*=/gi, "") // Remove event handlers
+		.trim();
+}
+
+function checkForMaliciousInput(input) {
+	const maliciousPatterns = [
+		/<script/i,
+		/<iframe/i,
+		/<object/i,
+		/<embed/i,
+		/<form/i,
+		/javascript:/i,
+		/data:/i,
+		/vbscript:/i,
+		/on\w+\s*=/i,
+		/eval\s*\(/i,
+		/alert\s*\(/i,
+		/confirm\s*\(/i,
+		/prompt\s*\(/i,
+		/document\.cookie/i,
+		/localStorage/i,
+		/sessionStorage/i,
+		/window\.location/i,
+		/\bunion\b\s+\bselect\b/i,
+		/\bdrop\b\s+\btable\b/i,
+		/--/i,
+		/;/i,
+		/\/\*/i,
+		/\*\//i,
+	];
+
+	return maliciousPatterns.some((pattern) => pattern.test(input));
+}
 const validationState = {
 	username: false,
 	email: false,
@@ -72,7 +111,7 @@ function validateEmail(email) {
 	}
 
 	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-	
+
 	if (!emailRegex.test(email)) {
 		if (emailInput) {
 			emailInput.classList.add("error");
@@ -145,8 +184,89 @@ function updatePasswordStrength(password) {
 }
 
 // -------------------------------
-// Confirm Password (Register/Reset Only)
+// Login Field Validation
 // -------------------------------
+function validateLoginUsername(username) {
+	const usernameInput = document.getElementById("uname");
+
+	if (!username) {
+		usernameInput.classList.remove("error", "success");
+		return false;
+	}
+
+	// Check for malicious input
+	if (checkForMaliciousInput(username)) {
+		usernameInput.classList.add("error");
+		usernameInput.classList.remove("success");
+		return false;
+	}
+
+	// Check for maximum length
+	if (username.length > 254) {
+		usernameInput.classList.add("error");
+		usernameInput.classList.remove("success");
+		return false;
+	}
+
+	// Basic email format validation if it looks like an email
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	const looksLikeEmail = username.includes("@");
+
+	if (looksLikeEmail && !emailRegex.test(username)) {
+		usernameInput.classList.add("error");
+		usernameInput.classList.remove("success");
+		return false;
+	}
+
+	// Username format validation if it doesn't look like an email
+	if (!looksLikeEmail) {
+		const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
+		if (!usernameRegex.test(username) || username.length < 3) {
+			usernameInput.classList.add("error");
+			usernameInput.classList.remove("success");
+			return false;
+		}
+	}
+
+	usernameInput.classList.remove("error");
+	usernameInput.classList.add("success");
+	return true;
+}
+
+function validateLoginPassword(password) {
+	const passwordInput = document.getElementById("password");
+
+	if (!password) {
+		passwordInput.classList.remove("error", "success");
+		return false;
+	}
+
+	// Check for malicious input
+	if (checkForMaliciousInput(password)) {
+		passwordInput.classList.add("error");
+		passwordInput.classList.remove("success");
+		return false;
+	}
+
+	// Check for maximum length
+	if (password.length > 128) {
+		passwordInput.classList.add("error");
+		passwordInput.classList.remove("success");
+		return false;
+	}
+
+	// Check for minimum length
+	if (password.length < 4) {
+		passwordInput.classList.add("error");
+		passwordInput.classList.remove("success");
+		return false;
+	}
+
+	passwordInput.classList.remove("error");
+	passwordInput.classList.add("success");
+	return true;
+}
+
 function validatePasswordConfirmation() {
 	const pass = document.getElementById("password");
 	const cpass = document.getElementById("cpassword");
@@ -180,7 +300,8 @@ function togglePassword(fieldId) {
 	const open = field.parentElement.querySelector(".eye-open");
 
 	field.type = field.type === "password" ? "text" : "password";
-	if (closed) closed.style.display = field.type === "password" ? "block" : "none";
+	if (closed)
+		closed.style.display = field.type === "password" ? "block" : "none";
 	if (open) open.style.display = field.type === "password" ? "none" : "block";
 }
 
@@ -194,19 +315,21 @@ document.addEventListener("DOMContentLoaded", () => {
 	const cpass = document.getElementById("cpassword");
 	const resetPasswordForm = document.getElementById("resetPasswordForm");
 
-	// Username events (shared - login & register)
-	if (uname) {
-		uname.addEventListener("input", (e) => validateUsername(e.target.value));
-		uname.addEventListener("keypress", (e) => {
-			if (!/^[a-zA-Z0-9]$/.test(e.key)) {
-				e.preventDefault();
-				const usernameInput = document.getElementById("usernameInput");
-				if (usernameInput) {
-					usernameInput.classList.add("error");
-					setTimeout(() => usernameInput.classList.remove("error"), 300);
-				}
-			}
-		});
+	// Login field events (real-time validation)
+	if (uname && loginForm) {
+		uname.addEventListener("input", (e) =>
+			validateLoginUsername(e.target.value.trim()),
+		);
+		uname.addEventListener("blur", (e) =>
+			validateLoginUsername(e.target.value.trim()),
+		);
+	}
+
+	if (pass && loginForm) {
+		pass.addEventListener("input", (e) =>
+			validateLoginPassword(e.target.value),
+		);
+		pass.addEventListener("blur", (e) => validateLoginPassword(e.target.value));
 	}
 
 	// Email events (register only)
@@ -277,26 +400,64 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 	}
 
-	// Login submit (minimal validation)
+	// Login submit (enhanced validation)
 	if (loginForm) {
 		loginForm.addEventListener("submit", (e) => {
-			// For login, username can be email too, so we don't validate strictly
-			if (!uname.value.trim()) {
+			let username = uname.value.trim();
+			let password = pass.value;
+
+			// Check for malicious input first (before sanitizing)
+			if (
+				checkForMaliciousInput(username) ||
+				checkForMaliciousInput(password)
+			) {
 				e.preventDefault();
-				showToast("Username or email cannot be empty", "error");
+				showToast("Invalid characters detected in input", "error");
 				return;
 			}
 
-			if (!pass.value.trim()) {
+			// Sanitize inputs
+			username = sanitizeInput(username);
+			password = sanitizeInput(password);
+
+			// Update the form fields with sanitized values
+			uname.value = username;
+			pass.value = password;
+
+			// Use validation functions for consistency
+			const isUsernameValid = validateLoginUsername(username);
+			const isPasswordValid = validateLoginPassword(password);
+
+			if (!isUsernameValid || !isPasswordValid) {
 				e.preventDefault();
-				showToast("Password cannot be empty", "error");
+				showToast("Please fix all errors before signing in", "error");
 				return;
 			}
 
-			if (pass.value.length < 4) {
-				e.preventDefault();
-				showToast("Password too short", "warning");
-				return;
+			// Check for common weak passwords (client-side warning, doesn't prevent login)
+			const commonWeakPasswords = [
+				"password",
+				"123456",
+				"123456789",
+				"qwerty",
+				"abc123",
+				"password123",
+				"admin",
+				"letmein",
+			];
+			if (commonWeakPasswords.includes(password.toLowerCase())) {
+				showToast(
+					"This password is very common and easily guessed. Consider using a stronger password.",
+					"warning",
+				);
+			}
+
+			// Check for repeated characters (potential weak password, warning only)
+			if (/(.)\1{3,}/.test(password)) {
+				showToast(
+					"Password contains too many repeated characters. Consider using a stronger password.",
+					"warning",
+				);
 			}
 
 			lockButton(null, "Signing In...", loginForm);
@@ -310,7 +471,9 @@ document.addEventListener("DOMContentLoaded", () => {
 function lockButton(id, text, form = null) {
 	const btn = id
 		? document.getElementById(id)
-		: form ? form.querySelector(".button-submit") : null;
+		: form
+			? form.querySelector(".button-submit")
+			: null;
 	if (!btn) return;
 	btn.disabled = true;
 	btn.classList.add("loading");

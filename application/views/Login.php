@@ -7,6 +7,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login | Welcome Back</title>
   <link rel="stylesheet" href="<?php echo base_url("assets/authstyles.css") ?>">
+  <script>
+    // Password toggle function
+    function togglePassword(fieldId) {
+      const field = document.getElementById(fieldId);
+      const parent = field.parentElement;
+      const eyeClosed = parent.querySelector('.eye-closed');
+      const eyeOpen = parent.querySelector('.eye-open');
+
+      if (field.type === 'password') {
+        field.type = 'text';
+        eyeClosed.style.display = 'none';
+        eyeOpen.style.display = 'block';
+      } else {
+        field.type = 'password';
+        eyeClosed.style.display = 'block';
+        eyeOpen.style.display = 'none';
+      }
+    }
+  </script>
 </head>
 
 <body>
@@ -24,13 +43,17 @@
   <?php endif; ?>
 
   <div>
-    <form class="form" id="loginForm">
+    <form class="form" id="loginForm" action="<?= site_url('AuthController/loginUser') ?>" method="post">
       <div class="flex-column">
         <h2>Welcome Back</h2>
       </div>
 
       <!-- Error message container -->
-      <div id="errorMessage" class="error-msg" style="display: none;"></div>
+      <?php if (isset($error)): ?>
+        <div class="error-msg" style="display: block;"><?php echo $error; ?></div>
+      <?php else: ?>
+        <div id="errorMessage" class="error-msg" style="display: none;"></div>
+      <?php endif; ?>
 
       <!-- Username/Email Field -->
       <div class="flex-column">
@@ -123,52 +146,6 @@
     }
   </script>
   <script src="<?php echo base_url("assets/js/token-manager.js") ?>"></script>
-  <script>
-    // Handle login form submission
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-
-      const submitBtn = document.getElementById('submitBtn');
-      const errorMessage = document.getElementById('errorMessage');
-      const originalBtnContent = submitBtn.innerHTML;
-
-      // Disable button and show loading
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span>Signing in...</span>';
-      errorMessage.style.display = 'none';
-
-      try {
-        const username = document.getElementById('uname').value;
-        const password = document.getElementById('password').value;
-
-        const response = await apiClient.post('login', {
-          username,
-          password
-        });
-
-        if (response.success && response.data.accessToken) {
-          // Store access token
-          apiClient.handleLoginResponse(response);
-
-          // Redirect to dashboard
-          window.location.href = '<?= site_url('DashboardController') ?>';
-        } else {
-          // Show error
-          const error = response.error?.message || 'Login failed';
-          errorMessage.textContent = error;
-          errorMessage.style.display = 'block';
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = originalBtnContent;
-        }
-      } catch (error) {
-        console.error('Login error:', error);
-        errorMessage.textContent = 'Server unreachable. Please try again later.';
-        errorMessage.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnContent;
-      }
-    });
-  </script>
 </body>
 
 </html>

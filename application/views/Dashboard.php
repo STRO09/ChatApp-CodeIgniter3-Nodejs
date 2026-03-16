@@ -257,6 +257,11 @@
       serverorigin: <?= json_encode($serverorigin) ?>
     }
 
+    // Set access token in localStorage
+    <?php if (!empty($access_token)): ?>
+    localStorage.setItem('jwt_token', <?php echo json_encode($access_token); ?>);
+    <?php endif; ?>
+
   </script>
   <script src="<?php echo base_url('assets/js/dashboardfunctions.js') ?>"></script>
 

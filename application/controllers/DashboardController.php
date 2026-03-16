@@ -13,8 +13,8 @@ class DashboardController extends CI_Controller
     {
         $this->load->helper('url');
 
-        // Get JWT from cookie
-        $jwt = get_cookie("jwt_token");
+        // Get JWT from cookie (refreshToken set by Node.js)
+        $jwt = get_cookie("refreshToken");
         if (!$jwt) {
             redirect('AuthController', 'refresh');
             return;
@@ -34,6 +34,10 @@ class DashboardController extends CI_Controller
         $data['userId'] = $userId;
         $data['username'] = $username;
         $data['email'] = $email;
+        $data['access_token'] = $this->session->userdata('access_token');
+
+        // Clear the access token from session after passing to view
+        $this->session->unset_userdata('access_token');
 
         $this->load->view("Dashboard", $data);
     }

@@ -65,6 +65,16 @@ body{
   border: 1.5px solid #2d79f3;
 }
 
+.inputForm.error {
+  border: 1.5px solid #e62c17;
+  background-color: #fef2f2;
+}
+
+.inputForm.success {
+  border: 1.5px solid #27ae60;
+  background-color: #f0f9f0;
+}
+
 .flex-row {
   display: flex;
   flex-direction: row;
@@ -209,6 +219,41 @@ h2 {
 .toast + .toast {
   margin-top: 12px;
 }
+
+/* Validation / error messaging */
+.error-msg {
+  color: #e62c17;
+  background: rgba(230, 44, 23, 0.1);
+  border: 1px solid rgba(230, 44, 23, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.success-msg {
+  color: #27ae60;
+  background: rgba(39, 174, 96, 0.1);
+  border: 1px solid rgba(39, 174, 96, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.validation-msg {
+  font-size: 13px;
+  margin: 3px 0;
+}
+
+.validation-msg.error {
+  color: #e62c17;
+}
+
+.validation-msg.success {
+  color: #27ae60;
+}
+
 
 .error {
 color: red;
