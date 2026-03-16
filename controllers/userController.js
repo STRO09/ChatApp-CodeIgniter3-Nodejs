@@ -61,9 +61,9 @@ const setRefreshTokenCookie = (res, refreshToken) => {
   res.cookie("refreshToken", refreshToken, cookieOptions);
 };
 
-/**
- * Helper to clear refresh token cookie
- */
+// /**
+//  * Helper to clear refresh token cookie
+//  */
 const clearRefreshTokenCookie = (res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
@@ -130,16 +130,16 @@ export const registerUser = asyncHandler(async (req, res) => {
  * Login User
  */
 export const loginUser = asyncHandler(async (req, res) => {
-  const { username, password } = req.body;
+  const { uid, password } = req.body;
 
-  if (!username || !password) {
+  if (!uid || !password) {
     throwError(ErrorCodes.VALIDATION_REQUIRED_FIELD, {
-      fields: ["username", "password"],
+      fields: ["userid", "password"],
     });
   }
 
   const user = await User.findOne({
-    $or: [{ username }, { email: username }],
+    $or: [{ username : uid }, { email: uid }],
   });
 
   if (!user) {
@@ -162,17 +162,17 @@ export const loginUser = asyncHandler(async (req, res) => {
       userAgent
     );
 
-  setRefreshTokenCookie(res, refreshToken);
-
   res.json(
     successResponse(
       {
         accessToken,
+        refreshToken,
         expiresIn,
         user: {
           id: user._id,
           username: user.username,
           email: user.email,
+          isBot: user.isBot
         },
       },
       "Login successful"
@@ -520,13 +520,14 @@ export const updateUserStatus = async (req, res) => {
   }
 };
 
-export const getUserById = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const user = await User.findById(userId).select("username email");
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ error: "Error fetching user" });
+
+export const getUserById = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await User.findById(userId).select("username email");
+  if (!user) {
+    throwError(ErrorCodes.USER_NOT_FOUND);
   }
-};
+
+  res.json(successResponse({ user }));
+});

@@ -1,12 +1,16 @@
 import express from 'express';
 import cors from 'cors';
-import connectDB from './config/dbConnection.js';
+import connectDB, {closeConnection} from './config/dbConnection.js';
 import { initSocket } from './sockets/socket.js';
 import cookieParser from "cookie-parser";
 import userRoutes from "./routes/userRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
 import messageRoutes from "./routes/MessageRoutes.js";
+<<<<<<< HEAD
 import { errorHandler } from './utils/ErrorHandler.js';
+=======
+import { errorHandler} from "./utils/ErrorHandler.js";
+>>>>>>> f3b86b1b822122e7a5631f7eeb869f559644dc50
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -89,13 +93,13 @@ initSocket(server);
 // Graceful Shutdown
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully...");
-  await mongoose.connection.close();
+  closeConnection(false);
   process.exit(0);
 });
 
 process.on("SIGINT", async () => {
   console.log("SIGINT received, shutting down gracefully...");
-  await mongoose.connection.close();
+  closeConnection(true);
   process.exit(0);
 });
 
