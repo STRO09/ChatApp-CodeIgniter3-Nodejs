@@ -43,11 +43,7 @@
   <?php endif; ?>
 
   <div>
-<<<<<<< HEAD
     <form class="form" id="loginForm" action="<?= site_url('AuthController/loginUser') ?>" method="post">
-=======
-    <form class="form" method="post" action="<?= site_url('AuthController/loginUser') ?>" id="loginForm">
->>>>>>> 1db6d40ff83d49d8a564e1899ea9dc96064c917b
       <div class="flex-column">
         <h2>Welcome Back</h2>
       </div>
