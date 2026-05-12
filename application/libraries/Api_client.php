@@ -21,7 +21,7 @@ class Api_client
 
     public function register($username, $email, $password)
     {
-        return $this->post('/api/register', [
+        return $this->post('/api/v1/register', [
             'username' => $username,
             'email'    => $email,
             'password' => $password,
@@ -30,7 +30,7 @@ class Api_client
 
     public function login($uid, $password)
     {
-        return $this->post('/api/login', [
+        return $this->post('/api/v1/login', [
             'uid' => $uid,
             'password' => $password,
         ]);
@@ -68,6 +68,11 @@ class Api_client
     public function logoutAllDevices()
     {
         return $this->post('/api/logout-all');
+    }
+
+    public function refreshToken()
+    {
+        return $this->post('/api/refresh');
     }
 
     public function getSessions()
@@ -140,7 +145,7 @@ class Api_client
     // INTERNAL HTTP HELPERS
     // ─────────────────────────────────────────
 
-    private function get($path, $params = [])
+    public function get($path, $params = [])
     {
         $url = $this->base_url . $path;
         if (!empty($params)) {
@@ -149,17 +154,17 @@ class Api_client
         return $this->makeRequest($url, 'GET');
     }
 
-    private function post($path, $data = [])
+    public function post($path, $data = [])
     {
         return $this->makeRequest($this->base_url . $path, 'POST', $data);
     }
 
-    private function put($path, $data = [])
+    public function put($path, $data = [])
     {
         return $this->makeRequest($this->base_url . $path, 'PUT', $data);
     }
 
-    private function delete($path)
+    public function delete($path)
     {
         return $this->makeRequest($this->base_url . $path, 'DELETE');
     }
@@ -224,8 +229,11 @@ class Api_client
                 return $this->makeRequest($url, $method, $data, $attempt + 1);
             }
 
-            log_message('error', "API failed after {$this->max_retries} retries: {$url}");
-            return false;
+            log_message('error', "API failed after {$this->max_retries} retries: {$url}. Error: {$curlError}");
+            return json_encode([
+                'success' => false,
+                'error' => ['message' => "Connection Failed to [{$url}]: {$curlError}"]
+            ]);
         }
 
         return $response;

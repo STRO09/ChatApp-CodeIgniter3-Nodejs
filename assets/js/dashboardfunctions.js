@@ -1,3 +1,31 @@
+
+async function appFetch(url, options = {}) {
+	options.credentials = 'include';
+	let response = await fetch(url, options);
+
+	if (response.status === 401) {
+		console.log('Token expired, attempting refresh...');
+		try {
+			// Note: Adjust the URL to match the CodeIgniter route
+			const refreshRes = await fetch(window.location.origin + '/ChatApp/index.php/AuthController/refreshToken', {
+				method: 'POST'
+			});
+			const refreshData = await refreshRes.json();
+
+			if (refreshData.success) {
+				// Retry with new cookies automatically sent
+				return fetch(url, options);
+			} else {
+				window.location.href = window.location.origin + '/ChatApp/index.php/AuthController/Logout';
+			}
+		} catch (e) {
+			window.location.href = window.location.origin + '/ChatApp/index.php/AuthController/Logout';
+		}
+	}
+
+	return response;
+}
+
 // ============================================================================
 // CONFIGURATION & CONSTANTS
 // ============================================================================
@@ -5,7 +33,7 @@ const APP_CONFIG = {
 	serverOrigin: APP.serverorigin,
 	myUserId: APP.myRealId,
 	myUsername: APP.myRealUsername,
-	isBot : APP.isBot
+	isBot: APP.isBot
 };
 
 // ============================================================================
@@ -119,6 +147,13 @@ let typingTimer = null;
 let selectedUsersForGroup = [];
 let unreadCounts = {};
 
+let pagination = {
+	limit: 50,
+	oldestMessageDate: null,
+	hasMore: true,
+	isLoading: false
+};
+
 // ============================================================================
 // SOCKET INITIALIZATION
 // ============================================================================
@@ -137,7 +172,7 @@ function initApp() {
 	socket.emit("authenticate", {
 		userId: myUserData.id,
 		username: myUserData.username,
-		isBot : myUserData.isBot
+		isBot: myUserData.isBot
 	});
 
 	// Load initial data
@@ -177,6 +212,13 @@ function setupChatEventListeners() {
 	chatElements.chatHeader.addEventListener("click", () => {
 		if (currentChatType === "group") {
 			showGroupManagementModal(currentConversation._id);
+		}
+	});
+
+	// Infinite scroll listener
+	chatElements.chatMessages.addEventListener("scroll", () => {
+		if (chatElements.chatMessages.scrollTop === 0) {
+			loadMoreMessages();
 		}
 	});
 }
@@ -445,7 +487,7 @@ async function saveProfileChanges() {
 			currentPassword: currentPassword,
 			newPassword: newPassword || null,
 		});
-		const response = await fetch(
+		const response = await appFetch(
 			`${APP_CONFIG.serverOrigin}/api/user/update-profile`,
 			{
 				method: "POST",
@@ -497,7 +539,7 @@ async function saveProfileChanges() {
 // ============================================================================
 async function loadConversations() {
 	try {
-		const response = await fetch(
+		const response = await appFetch(
 			`${APP_CONFIG.serverOrigin}/api/${myUserData.id}/conversations`,
 		);
 		const data = await response.json();
@@ -538,7 +580,7 @@ async function loadConversations() {
 
 async function loadGroups() {
 	try {
-		const response = await fetch(
+		const response = await appFetch(
 			`${APP_CONFIG.serverOrigin}/api/${myUserData.id}/groups`,
 		);
 		const data = await response.json();
@@ -566,7 +608,7 @@ async function loadGroups() {
 
 async function loadAllUsers() {
 	try {
-		const response = await fetch(
+		const response = await appFetch(
 			`${APP_CONFIG.serverOrigin}/api/users/chat/${myUserData.id}`,
 		);
 		const data = await response.json();
@@ -583,7 +625,7 @@ async function loadChatHistory(conversationId) {
 	chatElements.chatMessages.innerHTML = "";
 
 	try {
-		const response = await fetch(
+		const response = await appFetch(
 			`${APP_CONFIG.serverOrigin}/api/messages/${conversationId}?userId=${myUserData.id}`,
 		);
 		const messages = await response.json();
@@ -638,7 +680,7 @@ function renderRecentChats() {
 		);
 
 		if (!otherParticipant) return false;
-		if(otherParticipant.isBot) return false;
+		if (otherParticipant.isBot) return false;
 
 		// Only show if user is OFFLINE
 		const isOnline = onlineUserIds.has(otherParticipant._id);
@@ -723,20 +765,17 @@ function createConversationItem(data) {
 	// Show unread badge if count > 0
 	const unreadBadgeHTML =
 		(data.unread || 0) > 0
-			? `<div class="unread-badge">${
-					data.unread > 99 ? "99+" : data.unread
-				}</div>`
+			? `<div class="unread-badge">${data.unread > 99 ? "99+" : data.unread
+			}</div>`
 			: "";
 
 	item.innerHTML = `
   <div class="chat-avatar ${data.type === "group" ? "group" : ""}">
     <img src="${data.avatar}" alt="${data.name}">
-    ${
-			data.type === "private"
-				? `<div class="chat-status ${
-						data.isOnline ? "online" : "offline"
-					}"></div>`
-				: ""
+    ${data.type === "private"
+			? `<div class="chat-status ${data.isOnline ? "online" : "offline"
+			}"></div>`
+			: ""
 		}
   </div>
   <div class="chat-info">
@@ -745,10 +784,9 @@ function createConversationItem(data) {
       <div class="chat-time">${data.time}</div>
     </div>
     <div class="last-message">${data.lastMessage}</div>
-    ${
-			data.type === "group"
-				? `<div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">${data.participantsCount} members</div>`
-				: ""
+    ${data.type === "group"
+			? `<div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">${data.participantsCount} members</div>`
+			: ""
 		}
   </div>
   ${unreadBadgeHTML}
@@ -805,7 +843,7 @@ async function selectConversation(data) {
 
 		// Get or create conversation
 		try {
-			const response = await fetch(
+			const response = await appFetch(
 				`${APP_CONFIG.serverOrigin}/api/conversation`,
 				{
 					method: "POST",
@@ -865,7 +903,7 @@ async function selectConversation(data) {
 }
 
 // ============================================================================
-// MESSAGE HANDLING
+// MESSAGE HANDLING (SOCKET UPGRADED)
 // ============================================================================
 async function sendMessage() {
 	if (isAiChat) {
@@ -892,7 +930,7 @@ async function sendMessage() {
 	}
 
 	try {
-		const response = await fetch(`${APP_CONFIG.serverOrigin}/api/messages`, {
+		const response = await appFetch(`${APP_CONFIG.serverOrigin}/api/messages`, {
 			method: "POST",
 			body: formData,
 		});
@@ -936,10 +974,9 @@ function displayMessage(msg, isSent, isGroup = false) {
 	messageDiv.className = `message ${isSent ? "sent" : "received"}`;
 
 	let content = `<div class="message-content">
-    ${
-			msg.isGroup === true || isGroup === true
-				? `<span class="username">${msg.sender.username}:</span>`
-				: ""
+    ${msg.isGroup === true || isGroup === true
+			? `<span class="username">${msg.sender.username}:</span>`
+			: ""
 		}
     ${msg.text || ""}
   </div>`;
@@ -1018,7 +1055,7 @@ async function showGroupModal() {
 
 	// Load available users
 	try {
-		const response = await fetch(
+		const response = await appFetch(
 			`${APP_CONFIG.serverOrigin}/api/users/all/${myUserData.id}`,
 		);
 		const data = await response.json();
@@ -1046,11 +1083,10 @@ function createUserSelectItem(user) {
 	item.dataset.userId = user._id;
 
 	item.innerHTML = `
-    <img src="${
-			user.avatar ||
-			`https://ui-avatars.com/api/?name=${encodeURIComponent(
-				user.username,
-			)}&background=random&color=fff`
+    <img src="${user.avatar ||
+		`https://ui-avatars.com/api/?name=${encodeURIComponent(
+			user.username,
+		)}&background=random&color=fff`
 		}" alt="${user.username}">
     <div class="user-select-info">
       <h4 style="text-transform:capitalize">${user.username}</h4>
@@ -1155,7 +1191,7 @@ async function createGroup() {
 	}
 
 	try {
-		const response = await fetch(`${APP_CONFIG.serverOrigin}/api/group`, {
+		const response = await appFetch(`${APP_CONFIG.serverOrigin}/api/group`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -1195,7 +1231,7 @@ async function createGroup() {
 
 function showGroupManagementModal(conversationId) {
 	// Fetch group details
-	fetch(`${APP_CONFIG.serverOrigin}/api/conversation/${conversationId}`)
+	appFetch(`${APP_CONFIG.serverOrigin}/api/conversation/${conversationId}`)
 		.then((res) => res.json())
 		.then((group) => {
 			const modal = document.createElement("div");
@@ -1210,15 +1246,15 @@ function showGroupManagementModal(conversationId) {
             <h4>Members</h4>
             <ul id="members-list">
               ${group.participants
-								.map(
-									(u) => `
+					.map(
+						(u) => `
                 <li class="member-item">
                   <span class="member-name">${u.username}</span>
                   <button class="remove-user btn btn-secondary" data-id="${u._id}">Remove</button>
                 </li>
               `,
-								)
-								.join("")}
+					)
+					.join("")}
             </ul>
             <h4>Add User</h4>
             <div class="add-user-row">
@@ -1244,7 +1280,7 @@ function showGroupManagementModal(conversationId) {
 			modal.querySelectorAll(".remove-user").forEach((btn) => {
 				btn.addEventListener("click", () => {
 					const userId = btn.dataset.id;
-					fetch(`${APP_CONFIG.serverOrigin}/api/group/remove`, {
+					appFetch(`${APP_CONFIG.serverOrigin}/api/group/remove`, {
 						method: "POST",
 						headers: { "Content-Type": "application/json" },
 						body: JSON.stringify({ conversationId, userId }),
@@ -1265,7 +1301,7 @@ function showGroupManagementModal(conversationId) {
 							membersList.querySelectorAll(".remove-user").forEach((newBtn) => {
 								newBtn.addEventListener("click", () => {
 									const uid = newBtn.dataset.id;
-									fetch(`${APP_CONFIG.serverOrigin}/api/group/remove`, {
+									appFetch(`${APP_CONFIG.serverOrigin}/api/group/remove`, {
 										method: "POST",
 										headers: { "Content-Type": "application/json" },
 										body: JSON.stringify({ conversationId, userId: uid }),
@@ -1280,7 +1316,7 @@ function showGroupManagementModal(conversationId) {
 			modal.querySelector("#add-user-btn").addEventListener("click", () => {
 				const userName = document.getElementById("new-user-id").value.trim();
 				if (!userName) return;
-				fetch(`${APP_CONFIG.serverOrigin}/api/group/add`, {
+				appFetch(`${APP_CONFIG.serverOrigin}/api/group/add`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ conversationId, userName }),
@@ -1307,7 +1343,7 @@ function showGroupManagementModal(conversationId) {
 						"Are you sure you want to delete this group? This action cannot be undone.",
 					)
 				) {
-					fetch(`${APP_CONFIG.serverOrigin}/api/group/${conversationId}`, {
+					appFetch(`${APP_CONFIG.serverOrigin}/api/group/${conversationId}`, {
 						method: "DELETE",
 					}).then(() => {
 						alert("Group deleted successfully");
@@ -1373,7 +1409,7 @@ function updateDocumentTitle() {
 
 async function markConversationAsRead(conversationId) {
 	try {
-		const response = await fetch(
+		const response = await appFetch(
 			`${APP_CONFIG.serverOrigin}/api/conversation/${conversationId}/read`,
 			{
 				method: "POST",
@@ -1395,7 +1431,7 @@ function startUnreadCheck() {
 	// Check for unread messages every 30 seconds
 	setInterval(async () => {
 		try {
-			const response = await fetch(
+			const response = await appFetch(
 				`${APP_CONFIG.serverOrigin}/api/unread/${myUserData.id}`,
 			);
 			const data = await response.json();
@@ -1505,7 +1541,7 @@ function updateConversationLastMessage(conversationId, message) {
 async function openAiChat() {
 	if (!aiConversationId) {
 		try {
-			const res = await fetch(
+			const res = await appFetch(
 				`${APP_CONFIG.serverOrigin}/api/ai/conversation`,
 				{
 					method: "POST",
@@ -1694,4 +1730,123 @@ function formatTime(dateString) {
 	if (diffDays < 7) return `${diffDays}d ago`;
 
 	return date.toLocaleDateString();
+}
+
+async function loadChatHistory(conversationId) {
+	chatElements.chatMessages.innerHTML = "";
+	// Reset pagination for new chat
+	pagination.oldestMessageDate = null;
+	pagination.hasMore = true;
+	pagination.isLoading = false;
+
+	await fetchBatch(conversationId, false);
+}
+
+async function loadMoreMessages() {
+	if (!currentConversation || !pagination.hasMore || pagination.isLoading) return;
+
+	const conversationId = currentConversation._id;
+	const scrollHeightBefore = chatElements.chatMessages.scrollHeight;
+
+	await fetchBatch(conversationId, true);
+
+	// Maintain scroll position after loading older messages
+	const scrollHeightAfter = chatElements.chatMessages.scrollHeight;
+	chatElements.chatMessages.scrollTop = scrollHeightAfter - scrollHeightBefore;
+}
+
+async function fetchBatch(conversationId, isLoadMore = false) {
+	if (pagination.isLoading) return;
+	pagination.isLoading = true;
+
+	try {
+		let url = `${APP_CONFIG.serverOrigin}/api/messages/${conversationId}?userId=${myUserData.id}&limit=${pagination.limit}`;
+		if (isLoadMore && pagination.oldestMessageDate) {
+			url += `&before=${pagination.oldestMessageDate}`;
+		}
+
+		const response = await appFetch(url);
+		const data = await response.json();
+
+		const messages = data.messages;
+		const isGroup = data.isGroup;
+		pagination.hasMore = data.hasMore;
+
+		if (messages.length > 0) {
+			// Update oldest message date for next fetch
+			pagination.oldestMessageDate = messages[0].createdAt;
+
+			if (isLoadMore) {
+				// Prepend older messages
+				const fragment = document.createDocumentFragment();
+				messages.forEach((msg) => {
+					// We need a helper to create the element without appending immediately
+					const msgEl = createMessageElement(msg, msg.sender._id === myUserData.id, isGroup);
+					fragment.appendChild(msgEl);
+				});
+				chatElements.chatMessages.insertBefore(fragment, chatElements.chatMessages.firstChild);
+			} else {
+				// Initial load
+				messages.forEach((msg) => {
+					displayMessage(msg, msg.sender._id === myUserData.id, isGroup);
+				});
+				chatElements.chatMessages.scrollTop = chatElements.chatMessages.scrollHeight;
+			}
+		} else if (!isLoadMore) {
+			const welcomeMsg = document.createElement("div");
+			welcomeMsg.className = "message received";
+			welcomeMsg.innerHTML = `
+        <div class="message-content">
+          Start your conversation! Send your first message.
+        </div>
+        <div class="message-time">Just now</div>
+      `;
+			chatElements.chatMessages.appendChild(welcomeMsg);
+		}
+	} catch (err) {
+		console.error("Error loading messages:", err);
+	} finally {
+		pagination.isLoading = false;
+	}
+}
+
+// Helper to create message element without appending (for prepending)
+function createMessageElement(msg, isMe, isGroup) {
+	const messageDiv = document.createElement("div");
+	messageDiv.className = `message ${isMe ? "sent" : "received"}`;
+
+	let content = `<div class="message-content">
+    ${isGroup && !isMe
+			? `<span class="username">${msg.sender.username}:</span>`
+			: ""
+		}
+    ${msg.text || ""}
+  </div>`;
+
+	// Add attachments if present
+	if (msg.attachments && msg.attachments.length > 0) {
+		msg.attachments.forEach((att) => {
+			const secureUrl = `${APP_CONFIG.serverOrigin}/api/messages/file/${msg._id}/${att.fileUrl}?userId=${myUserData.id}`;
+
+			if (att.fileType.startsWith("image/")) {
+				content += `<div class="attachment"><img src="${secureUrl}" alt="${att.fileName}"></div>`;
+			} else if (att.fileType.startsWith("video/")) {
+				content += `<div class="attachment"><video controls><source src="${secureUrl}" type="${att.fileType}"></video></div>`;
+			} else {
+				content += `<a href="${secureUrl}" target="_blank" class="attachment-file">
+          <i class="fas fa-file"></i>
+          <span>${att.fileName}</span>
+        </a>`;
+			}
+		});
+	}
+
+	const time = new Date(msg.createdAt).toLocaleTimeString([], {
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+	content += `<div class="message-time">${time}</div>`;
+
+	messageDiv.innerHTML = content;
+	return messageDiv;
 }

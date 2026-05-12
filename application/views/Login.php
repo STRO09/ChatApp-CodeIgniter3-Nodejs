@@ -7,25 +7,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login | Welcome Back</title>
   <link rel="stylesheet" href="<?php echo base_url("assets/authstyles.css") ?>">
-  <script>
-    // Password toggle function
-    function togglePassword(fieldId) {
-      const field = document.getElementById(fieldId);
-      const parent = field.parentElement;
-      const eyeClosed = parent.querySelector('.eye-closed');
-      const eyeOpen = parent.querySelector('.eye-open');
-
-      if (field.type === 'password') {
-        field.type = 'text';
-        eyeClosed.style.display = 'none';
-        eyeOpen.style.display = 'block';
-      } else {
-        field.type = 'password';
-        eyeClosed.style.display = 'block';
-        eyeOpen.style.display = 'none';
-      }
-    }
-  </script>
 </head>
 
 <body>
@@ -103,7 +84,8 @@
       </div>
 
       <div class="flex-row">
-        <a href="<?= site_url('AuthController/forgotPassword') ?>" class="span" style="cursor: pointer;">Forgot password?</a>
+        <a href="<?= site_url('AuthController/forgotPassword') ?>" class="span" style="cursor: pointer;">Forgot
+          password?</a>
       </div>
 
       <button class="button-submit" type="submit" id="submitBtn">
@@ -118,36 +100,8 @@
     </form>
   </div>
 
-  <script>
-    // Toast notification
-    const toast = document.getElementById("toast");
-    if (toast) {
-      setTimeout(() => toast.classList.add("show"), 100);
-      setTimeout(() => {
-        toast.classList.remove("show");
-        setTimeout(() => toast.remove(), 400);
-      }, 3000);
-    }
-
-    // Password toggle function
-    function togglePassword(fieldId) {
-      const field = document.getElementById(fieldId);
-      const parent = field.parentElement;
-      const eyeClosed = parent.querySelector('.eye-closed');
-      const eyeOpen = parent.querySelector('.eye-open');
-
-      if (field.type === 'password') {
-        field.type = 'text';
-        eyeClosed.style.display = 'none';
-        eyeOpen.style.display = 'block';
-      } else {
-        field.type = 'password';
-        eyeClosed.style.display = 'block';
-        eyeOpen.style.display = 'none';
-      }
-    }
-  </script>
   <script src="<?php echo base_url("assets/js/token-manager.js") ?>"></script>
+  <script src="<?php echo base_url("assets/js/auth-validation.js") ?>"></script>
 
 </body>
 

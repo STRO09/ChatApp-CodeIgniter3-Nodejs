@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /**
  * API Client Library with Retry Logic and Token Management
  */
-class Api_client
+class Api_clientv1
 {
     protected $CI;
     protected $base_url;

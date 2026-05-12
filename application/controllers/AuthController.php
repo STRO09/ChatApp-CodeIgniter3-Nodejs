@@ -250,7 +250,7 @@ class AuthController extends CI_Controller
         ];
 
         // Make API request
-        $response = $this->api_client->post('register', $postData);
+        $response = $this->api_client->post('/api/v1/register', $postData);
 
         $result = $this->api_client->handleResponse($response);
 
@@ -278,22 +278,22 @@ class AuthController extends CI_Controller
 
     public function loginUser()
 {
-        $username = $this->input->post("uname");
+        $uid = $this->input->post("uid");
         $password = $this->input->post("password");
 
         // Sanitize inputs
-        $username = $this->sanitizeInput($username);
+        $uid = $this->sanitizeInput($uid);
         $password = $this->sanitizeInput($password);
 
         // Check for malicious input
-        if ($this->checkForMaliciousInput($username) || $this->checkForMaliciousInput($password)) {
-            $data["error"] = "Invalid characters detected in input";
-            $this->load->view("Login", $data);
-            return;
-        }
+        // if ($this->checkForMaliciousInput($uid) || $this->checkForMaliciousInput($password)) {
+        //     $data["error"] = "Invalid characters detected in input";
+        //     $this->load->view("Login", $data);
+        //     return;
+        // }
 
         // Validate username
-        $usernameValidation = $this->validateLoginUsername($username);
+        $usernameValidation = $this->validateLoginUsername($uid);
         if ($usernameValidation !== true) {
             $data["error"] = $usernameValidation;
             $this->load->view("Login", $data);
@@ -320,12 +320,12 @@ class AuthController extends CI_Controller
         }
 
         $postData = [
-            "username" => $username,
+            "uid" => $uid,
             "password" => $password,
         ];
 
         // Make API request
-        $response = $this->api_client->post('login', $postData);
+        $response = $this->api_client->post('/api/v1/login', $postData);
 
         $result = $this->api_client->handleResponse($response);
 
@@ -353,10 +353,31 @@ class AuthController extends CI_Controller
         // }
         // Store access token info for client-side
         if (isset($result['data']['accessToken'])) {
-            // Store access token in session for client-side to pick up
+            // Set access token in an HttpOnly cookie
+            set_cookie([
+                "name" => "accessToken",
+                "value" => $result['data']['accessToken'],
+                "expire" => 15 * 60, // 15 mins
+                "secure" => false,
+                "httponly" => true,
+                "path" => "/"
+            ]);
+            
+            // Store access token in session for client-side to pick up (optional)
             $this->session->set_userdata("access_token", $result['data']['accessToken']);
             $this->session->set_userdata("has_access_token", true);
-            // Note: Client-side JS will move this to localStorage
+        }
+
+        if (isset($result['data']['refreshToken'])) {
+            // Set refresh token in an HttpOnly cookie
+            set_cookie([
+                "name" => "refreshToken",
+                "value" => $result['data']['refreshToken'],
+                "expire" => 7 * 24 * 60 * 60, // 7 days
+                "secure" => false,
+                "httponly" => true,
+                "path" => "/"
+            ]);
         }
 
         redirect("DashboardController");
@@ -512,7 +533,13 @@ class AuthController extends CI_Controller
         $this->session->unset_userdata('username');
         $this->session->unset_userdata('userId');
         $this->session->unset_userdata('email');
+        $this->session->unset_userdata('access_token');
+        $this->session->unset_userdata('has_access_token');
         $this->session->sess_destroy();
+        
+        // Clear cookies
+        delete_cookie('accessToken');
+        delete_cookie('refreshToken');
 
         redirect('AuthController', 'refresh');
     }
@@ -526,8 +553,37 @@ class AuthController extends CI_Controller
         $this->session->unset_userdata('username');
         $this->session->unset_userdata('userId');
         $this->session->unset_userdata('email');
+        $this->session->unset_userdata('access_token');
+        $this->session->unset_userdata('has_access_token');
         $this->session->sess_destroy();
 
+        // Clear cookies
+        delete_cookie('accessToken');
+        delete_cookie('refreshToken');
+
         redirect('AuthController', 'refresh');
+    }
+
+    public function refreshToken()
+    {
+        $response = $this->api_client->refreshToken();
+        $result = $this->api_client->handleResponse($response);
+
+        if ($result && isset($result['success']) && $result['success']) {
+            if (isset($result['data']['accessToken'])) {
+                set_cookie([
+                    "name" => "accessToken",
+                    "value" => $result['data']['accessToken'],
+                    "expire" => 15 * 60,
+                    "secure" => false,
+                    "httponly" => true,
+                    "path" => "/"
+                ]);
+                $this->session->set_userdata("access_token", $result['data']['accessToken']);
+            }
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false]);
+        }
     }
 }

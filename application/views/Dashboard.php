@@ -15,39 +15,18 @@
 </head>
 
   <script>
-    function decodeJWT(token) {
-      const payload = token.split(".")[1];
-      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-      const json = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join("")
-      );
-      return JSON.parse(json);
-    }
-
-    const jwt = localStorage.getItem("access_token");
-
-    if (!jwt) {
-      window.location.href = "<?= site_url('AuthController') ?>";
-    }
-
-    const decodedjwt = decodeJWT(jwt);
-
     // ---------------------------------------------------------------
-    // Pull identity from JWT claims.
-    // Adjust the claim keys below to match your actual token payload
-    // (e.g. decodedjwt.sub, decodedjwt.user_id, decodedjwt.name …)
+    // Pull identity from PHP variables injected by DashboardController
     // ---------------------------------------------------------------
-    const myUsername = decodedjwt.username;
-    const myUserId   = decodedjwt.id;
-    const isBot = decodedjwt.isBot;
+    const myUsername = <?= json_encode($username) ?>;
+    const myUserId   = <?= json_encode($userId) ?>;
+    const isBot      = <?= json_encode(isset($isBot) ? $isBot : false) ?>;
+    
     window.APP = {
       myRealUsername: myUsername,
       myRealId:       myUserId,
-      isBot : isBot,
-      serverorigin:   <?= json_encode($serverorigin) ?>  // server config – still requires PHP
+      isBot :         isBot,
+      serverorigin:   window.location.protocol + "//" + window.location.hostname + ":7360"
     };
 
     // Populate all identity-dependent DOM nodes as soon as the
@@ -178,8 +157,8 @@
           </button>
         </div>
         <span id="file-name" class="file-name"></span>
-        <input type="text" class="message-input" id="message-input" placeholder="Type your message here..." disabled>
-        <button class="send-button" id="send-button" disabled>
+        <input type="text" class="message-input" id="message-input" placeholder="Type your message here...">
+        <button class="send-button" id="send-button">
           <i class="fas fa-paper-plane"></i>
         </button>
       </div>
@@ -290,23 +269,6 @@
       </div>
     </div>
   </div>
-
-  <script>
-    window.APP = {
-      // Get username from PHP
-      myRealUsername: <?php echo json_encode($username); ?>,
-      myRealId: <?php echo json_encode($userId); ?>,
-
-      // Socket.IO connection
-      serverorigin: <?= json_encode($serverorigin) ?>
-    }
-
-    // Set access token in localStorage
-    <?php if (!empty($access_token)): ?>
-    localStorage.setItem('jwt_token', <?php echo json_encode($access_token); ?>);
-    <?php endif; ?>
-
-  </script>
 
   <script src="<?php echo base_url('assets/js/dashboardfunctions.js') ?>"></script>
 
