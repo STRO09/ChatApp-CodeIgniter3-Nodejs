@@ -1,7 +1,7 @@
 import Conversation from '../models/Conversations.js';
 import Message from '../models/Messages.js';
 import User from '../models/User.js';
-import { getUnreadCount } from './messageController.js';
+import { getUnreadCount, getBulkUnreadCounts } from './messageController.js';
 
 export const getOrCreateConversation = async (req, res) => {
   try {
@@ -46,28 +46,17 @@ export const getUserConversations = async (req, res) => {
     const conversations = await Conversation.find({ 
       participants: userId 
     })
-    .populate('participants', 'username')
+    .populate('participants', 'username isBot')
     .populate('lastMessage')
     .sort({ updatedAt: -1 });
 
-    // Get unread count for each conversation
-    const conversationsWithUnread = await Promise.all(
-      conversations.map(async (conv) => {
-        try {
-          const unreadCount = await getUnreadCount(conv._id, userId);
-          return {
-            ...conv.toObject(),
-            unreadCount
-          };
-        } catch (err) {
-          console.error(`Error getting unread count for conversation ${conv._id}:`, err);
-          return {
-            ...conv.toObject(),
-            unreadCount: 0
-          };
-        }
-      })
-    );
+    // Get unread counts in bulk for better performance
+    const unreadCountsMap = await getBulkUnreadCounts(conversations, userId);
+
+    const conversationsWithUnread = conversations.map((conv) => ({
+      ...conv.toObject(),
+      unreadCount: unreadCountsMap[conv._id.toString()] || 0
+    }));
 
     res.json({ conversations: conversationsWithUnread });
   } catch (err) {
@@ -149,29 +138,18 @@ export const getGroupConversations = async (req, res) => {
       isGroup: true,
       participants: userId
     })
-    .populate('participants', 'username')
+    .populate('participants', 'username isBot')
     .populate('groupAdmin', 'username')
     .populate('lastMessage')
     .sort({ updatedAt: -1 });
 
-    // Get unread count for each group
-    const groupsWithUnread = await Promise.all(
-      groups.map(async (group) => {
-        try {
-          const unreadCount = await getUnreadCount(group._id, userId);
-          return {
-            ...group.toObject(),
-            unreadCount
-          };
-        } catch (err) {
-          console.error(`Error getting unread count for group ${group._id}:`, err);
-          return {
-            ...group.toObject(),
-            unreadCount: 0
-          };
-        }
-      })
-    );
+    // Get unread counts in bulk for better performance
+    const unreadCountsMap = await getBulkUnreadCounts(groups, userId);
+
+    const groupsWithUnread = groups.map((group) => ({
+      ...group.toObject(),
+      unreadCount: unreadCountsMap[group._id.toString()] || 0
+    }));
 
     res.json({ groups: groupsWithUnread });
   } catch (err) {
@@ -186,7 +164,7 @@ export const getConversationById = async (req, res) => {
     const { userId } = req.query;
     
     const conversation = await Conversation.findById(conversationId)
-      .populate('participants', 'username avatar status')
+      .populate('participants', 'username avatar status isBot')
       .populate('groupAdmin', 'username')
       .populate('lastMessage');
 
@@ -290,18 +268,9 @@ export const getTotalUnreadCount = async (req, res) => {
       participants: userId 
     });
 
-    let totalUnread = 0;
-    
-    // Sum unread counts for all conversations
-    for (const conv of conversations) {
-      try {
-        const unreadCount = await getUnreadCount(conv._id, userId);
-        totalUnread += unreadCount;
-      } catch (err) {
-        console.error(`Error getting unread count for conversation ${conv._id}:`, err);
-        // Continue with next conversation
-      }
-    }
+    // Sum unread counts using bulk helper
+    const unreadCountsMap = await getBulkUnreadCounts(conversations, userId);
+    const totalUnread = Object.values(unreadCountsMap).reduce((sum, count) => sum + count, 0);
 
     res.json({ totalUnread });
   } catch (err) {

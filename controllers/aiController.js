@@ -106,7 +106,7 @@ export const handleAiMessage = async (socket, io, data) => {
 
 export const getOrCreateAiConversation = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.user.id;
     const botUser     = await mongoose.model('User').findOne({ isBot: true });
 
     if (!botUser) {

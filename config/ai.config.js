@@ -36,12 +36,9 @@ Keep responses under 200 words unless the user explicitly asks for a detailed ex
   // Order matters
   // ─────────────────────────────────────────────
   modelFallbackChain: [
-    // 'anthropic_haiku_free',
-    "gemini_pro_free",
     "gemini_flash_free",
+    "gemini_pro_free",
     "openai_gpt4o_mini_free",
-    // 'anthropic_sonnet_paid',
-    // 'openai_gpt4o_paid'
   ],
   // ─────────────────────────────────────────────
   // Model registry
@@ -85,7 +82,7 @@ Keep responses under 200 words unless the user explicitly asks for a detailed ex
     // ─────── Gemini ───────
     gemini_pro_free: {
       provider: "gemini",
-      modelId: "gemini-1.0-pro",
+      modelId: "models/gemini-pro",
       cost: "free",
       maxInputTokens: 8192,
       maxOutputTokens: 1024,
@@ -93,7 +90,7 @@ Keep responses under 200 words unless the user explicitly asks for a detailed ex
     },
     gemini_flash_free: {
       provider: "gemini",
-      modelId: "gemini-1.5-flash",
+      modelId: "models/gemini-1.5-flash",
       cost: "free",
       maxInputTokens: 10000,
       maxOutputTokens: 1024,

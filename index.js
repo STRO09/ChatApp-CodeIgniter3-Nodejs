@@ -25,8 +25,8 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Middleware
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || "http://localhost" || 'http://[::1]',
-    methods: ["GET", "POST", "PUT", "DELETE"],
+  origin: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true, // Allow cookies
   optionsSuccessStatus: 200,
 };

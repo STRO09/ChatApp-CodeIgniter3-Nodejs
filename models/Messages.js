@@ -35,4 +35,7 @@ const MessageSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Optimization for high-performance reads (<100ms)
+MessageSchema.index({ conversationId: 1, createdAt: -1 });
+
 export default mongoose.model('Message', MessageSchema);

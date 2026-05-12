@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import Conversation from '../models/Conversations.js';
 import { handleAiMessage } from '../controllers/aiController.js';
+import { saveMessageInternal } from '../controllers/MessageController.js';
 
 // Store connected users with userId as key
 const connectedUsers = new Map();
@@ -68,6 +69,50 @@ export const initSocket = (server) => {
       if (activeConversations.get(userId) === conversationId) {
         activeConversations.delete(userId);
         console.log(`User ${userId} is no longer viewing conversation ${conversationId}`);
+      }
+    });
+    
+    // NEW: Handle sending messages via socket (replaces API POST for text messages)
+    socket.on('sendMessage', async (data) => {
+      try {
+        const { conversationId, senderId, text } = data;
+        
+        // 1. Save to DB asynchronously
+        const savedMessage = await saveMessageInternal({ conversationId, senderId, text });
+        
+        // 2. Broadcast to all participants in the conversation
+        const conversation = await Conversation.findById(conversationId)
+          .populate('participants', '_id username');
+          
+        if (!conversation) return;
+
+        const messageData = {
+          room: conversation.roomName,
+          senderId: senderId,
+          message: savedMessage,
+          conversationId: conversationId,
+          createdAt: new Date()
+        };
+
+        // Forward to other participants
+        conversation.participants.forEach(participant => {
+          if (participant._id.toString() !== senderId.toString()) {
+            const userSocket = Array.from(connectedUsers.values()).find(
+              u => u.userId === participant._id.toString()
+            );
+            
+            if (userSocket) {
+              io.to(userSocket.socketId).emit('chatRoom', messageData);
+            }
+          }
+        });
+        
+        // Send confirmation back to sender with the saved message (includes _id)
+        socket.emit('messageSent', savedMessage);
+
+      } catch (err) {
+        console.error("Error in sendMessage socket event:", err);
+        socket.emit('messageError', { error: err.message });
       }
     });
 

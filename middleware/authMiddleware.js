@@ -7,9 +7,13 @@ import User from "../models/User.js";
  */
 export const authenticateToken = async (req, res, next) => {
   try {
-    // Extract token from Authorization header
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+    // Extract token from cookies or Authorization header
+    let token = req.cookies?.accessToken;
+    
+    if (!token) {
+      const authHeader = req.headers["authorization"];
+      token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+    }
 
     if (!token) {
       throwError(ErrorCodes.AUTH_TOKEN_MISSING);
@@ -36,8 +40,11 @@ export const authenticateToken = async (req, res, next) => {
  */
 export const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
+    let token = req.cookies?.accessToken;
+    if (!token) {
+      const authHeader = req.headers["authorization"];
+      token = authHeader && authHeader.split(" ")[1];
+    }
 
     if (token) {
       const decoded = verifyAccessToken(token);

@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { getMessages, addMessage, getSecureFile } from '../controllers/messageController.js';
 import { findConversationBetweenUsers } from '../controllers/conversationController.js';
+import { authenticateAndVerifyUser } from '../middleware/authMiddleware.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -52,9 +53,9 @@ const upload = multer({
 });
 
 // Routes
-router.get('/messages/:conversationId', getMessages);
-router.post('/messages', upload.single('file'), addMessage);
-router.get('/messages/file/:messageId/:fileName', getSecureFile);
-router.get('/conversation/find/:userId1/:userId2', findConversationBetweenUsers);
+router.get('/messages/:conversationId', authenticateAndVerifyUser, getMessages);
+router.post('/messages', authenticateAndVerifyUser, upload.single('file'), addMessage);
+router.get('/messages/file/:messageId/:fileName', authenticateAndVerifyUser, getSecureFile);
+router.get('/conversation/find/:userId1/:userId2', authenticateAndVerifyUser, findConversationBetweenUsers);
 
 export default router;

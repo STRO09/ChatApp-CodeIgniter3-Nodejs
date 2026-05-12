@@ -26,13 +26,19 @@ export function createGeminiProvider(apiKey) {
 
   return {
     async *stream({ systemPrompt, messages, modelId, maxOutputTokens }) {
-      const model = genAI.getGenerativeModel({
-        model: modelId,
-        systemInstruction: systemPrompt,
-      });
+      const modelOptions = { model: modelId };
+      if (systemPrompt && modelId.includes('1.5')) {
+        modelOptions.systemInstruction = systemPrompt;
+      }
+      const model = genAI.getGenerativeModel(modelOptions, { apiVersion: 'v1' });
+
+      const contents = enforceAlternatingTurns(messages);
+      if (systemPrompt && !modelId.includes('1.5')) {
+        contents.unshift({ role: "user", parts: [{ text: `SYSTEM INSTRUCTION: ${systemPrompt}` }] });
+      }
 
       const result = await model.generateContentStream({
-        contents: enforceAlternatingTurns(messages),
+        contents: contents,
         generationConfig: { maxOutputTokens },
       });
 
