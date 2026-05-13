@@ -30,7 +30,7 @@ export function createGeminiProvider(apiKey) {
       if (systemPrompt && modelId.includes('1.5')) {
         modelOptions.systemInstruction = systemPrompt;
       }
-      const model = genAI.getGenerativeModel(modelOptions, { apiVersion: 'v1' });
+      const model = genAI.getGenerativeModel(modelOptions, { apiVersion: 'v1beta' });
 
       const contents = enforceAlternatingTurns(messages);
       if (systemPrompt && !modelId.includes('1.5')) {

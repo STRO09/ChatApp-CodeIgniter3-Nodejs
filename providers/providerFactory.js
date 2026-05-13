@@ -1,10 +1,12 @@
 // import { createAnthropicProvider } from "./anthropicProvider.js";
+import {createOllamaProvider} from "./ollamaprovider.js";
 import { createOpenAIProvider } from "./openaiProvider.js";
 import { createGeminiProvider } from "./geminiProvider.js";
 import aiConfig from "../config/ai.config.js";
 
 const CREATORS = {
   // anthropic: createAnthropicProvider,
+  ollama : createOllamaProvider,
   openai: createOpenAIProvider,
   gemini: createGeminiProvider,
 };
@@ -20,7 +22,10 @@ function getProvider(name) {
   const apiKey = aiConfig.providers[name]?.apiKey;
   if (!apiKey) throw new Error(`[AI] No API key for "${name}"`);
 
-  const instance = creator(apiKey);
+  console.log(apiKey+"dekh yw");
+  const providerConfig = aiConfig.providers[name];
+
+  const instance = creator(providerConfig);
   cache.set(name, instance);
   return instance;
 }

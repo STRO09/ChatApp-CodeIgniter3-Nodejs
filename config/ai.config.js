@@ -24,6 +24,9 @@ Keep responses under 200 words unless the user explicitly asks for a detailed ex
     // anthropic: {
     //   apiKey: process.env.ANTHROPIC_API_KEY
     // },
+    ollama: {
+      apiKey: process.env.OLLAMA_API_KEY,
+    },
     openai: {
       apiKey: process.env.OPENAI_API_KEY,
     },
@@ -36,6 +39,7 @@ Keep responses under 200 words unless the user explicitly asks for a detailed ex
   // Order matters
   // ─────────────────────────────────────────────
   modelFallbackChain: [
+    "ollama_llama3_local",
     "gemini_flash_free",
     "gemini_pro_free",
     "openai_gpt4o_mini_free",
@@ -62,7 +66,16 @@ Keep responses under 200 words unless the user explicitly asks for a detailed ex
     //   maxOutputTokens: 2048,
     //   streaming: true
     // },
-    // ─────── OpenAI ───────
+    // ─────── Ollama ───────
+    ollama_llama3_local: {
+      provider: "ollama",
+      modelId: "gpt-oss:120b-cloud",
+      cost: "free",
+      maxInputTokens: 8192,
+      maxOutputTokens: 1024,
+      streaming: true,
+    },
+     // ─────── OpenAI ───────
     openai_gpt4o_mini_free: {
       provider: "openai",
       modelId: "gpt-4o-mini",
