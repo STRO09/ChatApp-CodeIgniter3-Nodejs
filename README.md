@@ -30,8 +30,8 @@ This repository uses a branch-based organization:
 | Branch | Purpose |
 |----------|----------|
 | `main` | Documentation and project overview |
-| `frontend` | Chat application frontend |
-| `backend` | CodeIgniter API, Node.js Socket.IO server, MongoDB integration, and AI services |
+| `frontend` | Chat application CodeIgniter3 frontend |
+| `backend` | Node.js Socket.IO server, MongoDB and AI integration |
 
 > The `main` branch contains only project documentation. Application source code is maintained in the dedicated frontend and backend branches.
 
