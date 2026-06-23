@@ -1,12 +1,12 @@
 <?php
-defined("BASEPATH") or exit("No direct script access allowed");
+defined('BASEPATH') or exit('No direct script access allowed');
 
 class AuthController extends CI_Controller
 {
     public function __construct()
     {
         parent::__construct();
-        $this->load->helper(["url", "cookie"]);
+        $this->load->helper(['url', 'cookie']);
         $this->load->library(['form_validation', 'api_client']);
     }
 
@@ -68,19 +68,19 @@ class AuthController extends CI_Controller
     private function validateUsername($username)
     {
         if (empty($username)) {
-            return "Username is required";
+            return 'Username is required';
         }
 
         if (strlen($username) < 3) {
-            return "Username must be at least 3 characters long";
+            return 'Username must be at least 3 characters long';
         }
 
         if (!preg_match('/^[a-zA-Z0-9]+$/', $username)) {
-            return "Username can only contain letters and numbers";
+            return 'Username can only contain letters and numbers';
         }
 
         if (!preg_match('/^(?=(?:.*[a-zA-Z]){3,}).+$/', $username)) {
-            return "Username must contain at least 3 alphabets";
+            return 'Username must contain at least 3 alphabets';
         }
 
         return true;
@@ -89,11 +89,11 @@ class AuthController extends CI_Controller
     private function validateEmail($email)
     {
         if (empty($email)) {
-            return "Email is required";
+            return 'Email is required';
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return "Invalid email format";
+            return 'Invalid email format';
         }
 
         return true;
@@ -106,19 +106,19 @@ class AuthController extends CI_Controller
             'uppercase' => preg_match('/[A-Z]/', $password),
             'lowercase' => preg_match('/[a-z]/', $password),
             'number' => preg_match('/[0-9]/', $password),
-            'special' => preg_match('/[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]/', $password),
+            'special' => preg_match('/[!@#$%^&*()_+\-=\[\]{};\':"\|,.<>\/?]/', $password),
         ];
 
         $met = count(array_filter($requirements));
 
         if ($met >= 5)
-            $strength = "strong";
+            $strength = 'strong';
         elseif ($met >= 4)
-            $strength = "good";
+            $strength = 'good';
         elseif ($met >= 3)
-            $strength = "fair";
+            $strength = 'fair';
         else
-            $strength = "weak";
+            $strength = 'weak';
 
         return ['strength' => $strength, 'requirements' => $requirements];
     }
@@ -126,30 +126,30 @@ class AuthController extends CI_Controller
     private function validateLoginUsername($username)
     {
         if (empty($username)) {
-            return "Username or email is required";
+            return 'Username or email is required';
         }
 
         if ($this->checkForMaliciousInput($username)) {
-            return "Invalid characters detected in input";
+            return 'Invalid characters detected in input';
         }
 
         if (strlen($username) > 254) {
-            return "Username or email is too long";
+            return 'Username or email is too long';
         }
 
         // Check if it looks like an email
         $looksLikeEmail = strpos($username, '@') !== false;
 
         if ($looksLikeEmail && !filter_var($username, FILTER_VALIDATE_EMAIL)) {
-            return "Please enter a valid email address";
+            return 'Please enter a valid email address';
         }
 
         if (!$looksLikeEmail) {
             if (!preg_match('/^[a-zA-Z0-9_.-]+$/', $username)) {
-                return "Username can only contain letters, numbers, dots, hyphens, and underscores";
+                return 'Username can only contain letters, numbers, dots, hyphens, and underscores';
             }
             if (strlen($username) < 3) {
-                return "Username must be at least 3 characters";
+                return 'Username must be at least 3 characters';
             }
         }
 
@@ -159,19 +159,19 @@ class AuthController extends CI_Controller
     private function validateLoginPassword($password)
     {
         if (empty($password)) {
-            return "Password is required";
+            return 'Password is required';
         }
 
         if ($this->checkForMaliciousInput($password)) {
-            return "Invalid characters detected in input";
+            return 'Invalid characters detected in input';
         }
 
         if (strlen($password) > 128) {
-            return "Password is too long";
+            return 'Password is too long';
         }
 
         if (strlen($password) < 4) {
-            return "Password must be at least 4 characters";
+            return 'Password must be at least 4 characters';
         }
 
         return true;
@@ -179,20 +179,20 @@ class AuthController extends CI_Controller
 
     public function index()
     {
-        $this->load->view("Login");
+        $this->load->view('Login');
     }
 
     public function register()
     {
-        $this->load->view("Register");
+        $this->load->view('Register');
     }
 
     public function createUser()
     {
-        $username = $this->input->post("uname");
-        $email = $this->input->post("email");
-        $password = $this->input->post("password");
-        $cpassword = $this->input->post("cpassword");
+        $username = $this->input->post('uname');
+        $email = $this->input->post('email');
+        $password = $this->input->post('password');
+        $cpassword = $this->input->post('cpassword');
 
         // Sanitize inputs
         $username = $this->sanitizeInput($username);
@@ -207,46 +207,46 @@ class AuthController extends CI_Controller
             $this->checkForMaliciousInput($password) ||
             $this->checkForMaliciousInput($cpassword)
         ) {
-            $data["error"] = "Invalid characters detected in input";
-            $this->load->view("Register", $data);
+            $data['error'] = 'Invalid characters detected in input';
+            $this->load->view('Register', $data);
             return;
         }
 
         // Validate username
         $usernameValidation = $this->validateUsername($username);
         if ($usernameValidation !== true) {
-            $data["error"] = $usernameValidation;
-            $this->load->view("Register", $data);
+            $data['error'] = $usernameValidation;
+            $this->load->view('Register', $data);
             return;
         }
 
         // Validate email
         $emailValidation = $this->validateEmail($email);
         if ($emailValidation !== true) {
-            $data["error"] = $emailValidation;
-            $this->load->view("Register", $data);
+            $data['error'] = $emailValidation;
+            $this->load->view('Register', $data);
             return;
         }
 
         // Check password confirmation
         if ($password !== $cpassword) {
-            $data["error"] = "Passwords do not match";
-            $this->load->view("Register", $data);
+            $data['error'] = 'Passwords do not match';
+            $this->load->view('Register', $data);
             return;
         }
 
         // Check password strength
         $passwordStrength = $this->calculatePasswordStrength($password);
         if (!in_array($passwordStrength['strength'], ['good', 'strong'])) {
-            $data["error"] = "Password is too weak. Please use a stronger password.";
-            $this->load->view("Register", $data);
+            $data['error'] = 'Password is too weak. Please use a stronger password.';
+            $this->load->view('Register', $data);
             return;
         }
 
         $postData = [
-            "username" => $username,
-            "email" => $email,
-            "password" => $password,
+            'username' => $username,
+            'email' => $email,
+            'password' => $password,
         ];
 
         // Make API request
@@ -264,8 +264,8 @@ class AuthController extends CI_Controller
                 $errorMessage = 'Registration failed. Response: ' . json_encode($result);
             }
 
-            $data["error"] = $errorMessage;
-            $this->load->view("Register", $data);
+            $data['error'] = $errorMessage;
+            $this->load->view('Register', $data);
             return;
         }
 
@@ -273,55 +273,55 @@ class AuthController extends CI_Controller
             'toast_success',
             'Registration successful. Please login.'
         );
-        redirect("AuthController", "refresh");
+        redirect('AuthController', 'refresh');
     }
 
     public function loginUser()
-{
-        $uid = $this->input->post("uid");
-        $password = $this->input->post("password");
+    {
+        $uid = $this->input->post('uid');
+        $password = $this->input->post('password');
 
         // Sanitize inputs
         $uid = $this->sanitizeInput($uid);
         $password = $this->sanitizeInput($password);
 
         // Check for malicious input
-        // if ($this->checkForMaliciousInput($uid) || $this->checkForMaliciousInput($password)) {
-        //     $data["error"] = "Invalid characters detected in input";
-        //     $this->load->view("Login", $data);
-        //     return;
-        // }
+        if ($this->checkForMaliciousInput($uid) || $this->checkForMaliciousInput($password)) {
+            $data['error'] = 'Invalid characters detected in input';
+            $this->load->view('Login', $data);
+            return;
+        }
 
         // Validate username
         $usernameValidation = $this->validateLoginUsername($uid);
         if ($usernameValidation !== true) {
-            $data["error"] = $usernameValidation;
-            $this->load->view("Login", $data);
+            $data['error'] = $usernameValidation;
+            $this->load->view('Login', $data);
             return;
         }
 
         // Validate password
         $passwordValidation = $this->validateLoginPassword($password);
         if ($passwordValidation !== true) {
-            $data["error"] = $passwordValidation;
-            $this->load->view("Login", $data);
+            $data['error'] = $passwordValidation;
+            $this->load->view('Login', $data);
             return;
         }
 
         // Check for common weak passwords (warning, but allow login)
-        $commonWeakPasswords = ['password', '123456', '123456789', 'qwerty', 'abc123', 'password123', 'admin', 'letmein'];
-        if (in_array(strtolower($password), $commonWeakPasswords)) {
-            $this->session->set_flashdata('toast_warning', 'This password is very common and easily guessed. Consider using a stronger password.');
-        }
+        // $commonWeakPasswords = ['password', '123456', '123456789', 'qwerty', 'abc123', 'password123', 'admin', 'letmein'];
+        // if (in_array(strtolower($password), $commonWeakPasswords)) {
+        //     $this->session->set_flashdata('toast_warning', 'This password is very common and easily guessed. Consider using a stronger password.');
+        // }
 
-        // Check for repeated characters (warning)
-        if (preg_match('/(.)\1{3,}/', $password)) {
-            $this->session->set_flashdata('toast_warning', 'Password contains too many repeated characters. Consider using a stronger password.');
-        }
+        // // Check for repeated characters (warning)
+        // if (preg_match('/(.)\1{3,}/', $password)) {
+        //     $this->session->set_flashdata('toast_warning', 'Password contains too many repeated characters. Consider using a stronger password.');
+        // }
 
         $postData = [
-            "uid" => $uid,
-            "password" => $password,
+            'uid' => $uid,
+            'password' => $password,
         ];
 
         // Make API request
@@ -339,8 +339,8 @@ class AuthController extends CI_Controller
                 $errorMessage = 'Login failed. Response: ' . json_encode($result);
             }
 
-            $data["error"] = $errorMessage;
-            $this->load->view("Login", $data);
+            $data['error'] = $errorMessage;
+            $this->load->view('Login', $data);
             return;
         }
 
@@ -355,63 +355,63 @@ class AuthController extends CI_Controller
         if (isset($result['data']['accessToken'])) {
             // Set access token in an HttpOnly cookie
             set_cookie([
-                "name" => "accessToken",
-                "value" => $result['data']['accessToken'],
-                "expire" => 15 * 60, // 15 mins
-                "secure" => false,
-                "httponly" => true,
-                "path" => "/"
+                'name' => 'accessToken',
+                'value' => $result['data']['accessToken'],
+                'expire' => 15 * 60,  // 15 mins
+                'secure' => false,
+                'httponly' => true,
+                'path' => '/'
             ]);
-            
+
             // Store access token in session for client-side to pick up (optional)
-            $this->session->set_userdata("access_token", $result['data']['accessToken']);
-            $this->session->set_userdata("has_access_token", true);
+            $this->session->set_userdata('access_token', $result['data']['accessToken']);
+            $this->session->set_userdata('has_access_token', true);
         }
 
         if (isset($result['data']['refreshToken'])) {
             // Set refresh token in an HttpOnly cookie
             set_cookie([
-                "name" => "refreshToken",
-                "value" => $result['data']['refreshToken'],
-                "expire" => 7 * 24 * 60 * 60, // 7 days
-                "secure" => false,
-                "httponly" => true,
-                "path" => "/"
+                'name' => 'refreshToken',
+                'value' => $result['data']['refreshToken'],
+                'expire' => 7 * 24 * 60 * 60,  // 7 days
+                'secure' => false,
+                'httponly' => true,
+                'path' => '/'
             ]);
         }
 
-        redirect("DashboardController");
+        redirect('DashboardController');
     }
 
     public function forgotPassword()
     {
-        $this->load->view("ForgotPassword");
+        $this->load->view('ForgotPassword');
     }
 
     public function sendResetLink()
     {
-        $email = $this->input->post("email");
+        $email = $this->input->post('email');
 
         // Sanitize input
         $email = $this->sanitizeInput($email);
 
         // Check for malicious input
         if ($this->checkForMaliciousInput($email)) {
-            $data["error"] = "Invalid characters detected in input";
-            $this->load->view("ForgotPassword", $data);
+            $data['error'] = 'Invalid characters detected in input';
+            $this->load->view('ForgotPassword', $data);
             return;
         }
 
         if (!$email) {
-            $data["error"] = "Email is required";
-            $this->load->view("ForgotPassword", $data);
+            $data['error'] = 'Email is required';
+            $this->load->view('ForgotPassword', $data);
             return;
         }
         // Validate email
         $emailValidation = $this->validateEmail($email);
         if ($emailValidation !== true) {
-            $data["error"] = $emailValidation;
-            $this->load->view("ForgotPassword", $data);
+            $data['error'] = $emailValidation;
+            $this->load->view('ForgotPassword', $data);
             return;
         }
 
@@ -423,8 +423,8 @@ class AuthController extends CI_Controller
                 ? $result['error']['message']
                 : 'Failed to send reset link';
 
-            $data["error"] = $errorMessage;
-            $this->load->view("ForgotPassword", $data);
+            $data['error'] = $errorMessage;
+            $this->load->view('ForgotPassword', $data);
             return;
         }
 
@@ -432,14 +432,14 @@ class AuthController extends CI_Controller
             'toast_success',
             'Password reset link has been sent to your email.'
         );
-        redirect("AuthController", "refresh");
+        redirect('AuthController', 'refresh');
     }
 
     public function resetPassword($token = null)
     {
         if (!$token) {
             $this->session->set_flashdata('toast_error', 'Invalid reset link');
-            redirect("AuthController", "refresh");
+            redirect('AuthController', 'refresh');
             return;
         }
 
@@ -447,21 +447,21 @@ class AuthController extends CI_Controller
         $response = $this->api_client->verifyResetToken($token);
         $result = $this->api_client->handleResponse($response);
 
-        if (!isset($result["valid"]) || !$result["valid"]) {
+        if (!isset($result['valid']) || !$result['valid']) {
             $this->session->set_flashdata('toast_error', 'Invalid or expired reset link');
-            redirect("AuthController", "refresh");
+            redirect('AuthController', 'refresh');
             return;
         }
 
-        $data["token"] = $token;
-        $this->load->view("ResetPassword", $data);
+        $data['token'] = $token;
+        $this->load->view('ResetPassword', $data);
     }
 
     public function processResetPassword()
     {
-        $token = $this->input->post("token");
-        $password = $this->input->post("password");
-        $cpassword = $this->input->post("cpassword");
+        $token = $this->input->post('token');
+        $password = $this->input->post('password');
+        $cpassword = $this->input->post('cpassword');
 
         // Sanitize inputs
         $token = $this->sanitizeInput($token);
@@ -474,32 +474,32 @@ class AuthController extends CI_Controller
             $this->checkForMaliciousInput($password) ||
             $this->checkForMaliciousInput($cpassword)
         ) {
-            $data["error"] = "Invalid characters detected in input";
-            $data["token"] = $token;
-            $this->load->view("ResetPassword", $data);
+            $data['error'] = 'Invalid characters detected in input';
+            $data['token'] = $token;
+            $this->load->view('ResetPassword', $data);
             return;
         }
 
         if (!$token || !$password || !$cpassword) {
-            $data["error"] = "All fields are required";
-            $data["token"] = $token;
-            $this->load->view("ResetPassword", $data);
+            $data['error'] = 'All fields are required';
+            $data['token'] = $token;
+            $this->load->view('ResetPassword', $data);
             return;
         }
 
         if ($password !== $cpassword) {
-            $data["error"] = "Passwords do not match";
-            $data["token"] = $token;
-            $this->load->view("ResetPassword", $data);
+            $data['error'] = 'Passwords do not match';
+            $data['token'] = $token;
+            $this->load->view('ResetPassword', $data);
             return;
         }
 
         // Check password strength
         $passwordStrength = $this->calculatePasswordStrength($password);
         if (!in_array($passwordStrength['strength'], ['good', 'strong'])) {
-            $data["error"] = "Password is too weak. Please use a stronger password.";
-            $data["token"] = $token;
-            $this->load->view("ResetPassword", $data);
+            $data['error'] = 'Password is too weak. Please use a stronger password.';
+            $data['token'] = $token;
+            $this->load->view('ResetPassword', $data);
             return;
         }
 
@@ -511,9 +511,9 @@ class AuthController extends CI_Controller
                 ? $result['error']['message']
                 : 'Failed to reset password';
 
-            $data["error"] = $errorMessage;
-            $data["token"] = $token;
-            $this->load->view("ResetPassword", $data);
+            $data['error'] = $errorMessage;
+            $data['token'] = $token;
+            $this->load->view('ResetPassword', $data);
             return;
         }
 
@@ -521,7 +521,7 @@ class AuthController extends CI_Controller
             'toast_success',
             'Password reset successful. Please login with your new password.'
         );
-        redirect("AuthController", "refresh");
+        redirect('AuthController', 'refresh');
     }
 
     public function Logout()
@@ -536,7 +536,7 @@ class AuthController extends CI_Controller
         $this->session->unset_userdata('access_token');
         $this->session->unset_userdata('has_access_token');
         $this->session->sess_destroy();
-        
+
         // Clear cookies
         delete_cookie('accessToken');
         delete_cookie('refreshToken');
@@ -572,14 +572,14 @@ class AuthController extends CI_Controller
         if ($result && isset($result['success']) && $result['success']) {
             if (isset($result['data']['accessToken'])) {
                 set_cookie([
-                    "name" => "accessToken",
-                    "value" => $result['data']['accessToken'],
-                    "expire" => 15 * 60,
-                    "secure" => false,
-                    "httponly" => true,
-                    "path" => "/"
+                    'name' => 'accessToken',
+                    'value' => $result['data']['accessToken'],
+                    'expire' => 15 * 60,
+                    'secure' => false,
+                    'httponly' => true,
+                    'path' => '/'
                 ]);
-                $this->session->set_userdata("access_token", $result['data']['accessToken']);
+                $this->session->set_userdata('access_token', $result['data']['accessToken']);
             }
             echo json_encode(['success' => true]);
         } else {

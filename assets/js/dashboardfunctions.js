@@ -197,6 +197,7 @@ function setupEventListeners() {
 	setupFileEventListeners();
 	setupGroupModalEventListeners();
 	setupProfileEventListeners();
+	setupLogoutEventListeners();
 	setupSocketListeners();
 	setupAiListeners();
 }
@@ -298,6 +299,24 @@ function setupProfileEventListeners() {
 	});
 }
 
+function setupLogoutEventListeners() {
+	const logoutBtn = document.getElementById("logout-dropdown-btn");
+	const logoutDropdown = document.getElementById("logout-dropdown");
+
+	if (logoutBtn && logoutDropdown) {
+		logoutBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			logoutDropdown.classList.toggle("show");
+		});
+
+		document.addEventListener("click", (e) => {
+			if (!logoutBtn.contains(e.target) && !logoutDropdown.contains(e.target)) {
+				logoutDropdown.classList.remove("show");
+			}
+		});
+	}
+}
+
 function setupAiListeners() {
 	document.getElementById("ai-chat-btn").addEventListener("click", openAiChat);
 }
@@ -316,6 +335,13 @@ function setupSocketListeners() {
 	socket.on("aiStream", handleAiStream);
 	socket.on("aiComplete", handleAiComplete);
 	socket.on("aiError", handleAiError);
+
+	socket.on("forceLogout", (data) => {
+		if (data.userId === myUserData.id) {
+			console.log("Forced logout from another device");
+			window.location.href = window.location.origin + '/ChatApp/index.php/AuthController/Logout';
+		}
+	});
 
 	socket.on("disconnect", () => {
 		console.log("Disconnected from socket");

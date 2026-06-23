@@ -3,48 +3,7 @@
  * Unified client-side validation for Register & Login
  */
 
-// -------------------------------
-// Input Sanitization & Security
-// -------------------------------
-function sanitizeInput(input) {
-	// Remove potential script tags and other dangerous content
-	return input
-		.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-		.replace(/<[^>]*>/g, "") // Remove HTML tags
-		.replace(/javascript:/gi, "") // Remove javascript: URLs
-		.replace(/on\w+\s*=/gi, "") // Remove event handlers
-		.trim();
-}
 
-function checkForMaliciousInput(input) {
-	const maliciousPatterns = [
-		/<script/i,
-		/<iframe/i,
-		/<object/i,
-		/<embed/i,
-		/<form/i,
-		/javascript:/i,
-		/data:/i,
-		/vbscript:/i,
-		/on\w+\s*=/i,
-		/eval\s*\(/i,
-		/alert\s*\(/i,
-		/confirm\s*\(/i,
-		/prompt\s*\(/i,
-		/document\.cookie/i,
-		/localStorage/i,
-		/sessionStorage/i,
-		/window\.location/i,
-		/\bunion\b\s+\bselect\b/i,
-		/\bdrop\b\s+\btable\b/i,
-		/--/i,
-		/;/i,
-		/\/\*/i,
-		/\*\//i,
-	];
-
-	return maliciousPatterns.some((pattern) => pattern.test(input));
-}
 const validationState = {
 	username: false,
 	email: false,
@@ -170,9 +129,8 @@ function updatePasswordStrength(password) {
 	const { strength, requirements } = calculatePasswordStrength(password);
 
 	strengthFill.className = `strength-fill ${strength}`;
-	strengthText.textContent = `Password Strength: ${
-		strength.charAt(0).toUpperCase() + strength.slice(1)
-	}`;
+	strengthText.textContent = `Password Strength: ${strength.charAt(0).toUpperCase() + strength.slice(1)
+		}`;
 
 	Object.entries(requirements).forEach(([k, v]) => {
 		const el = document.getElementById(`req-${k}`);
@@ -187,24 +145,19 @@ function updatePasswordStrength(password) {
 // Login Field Validation
 // -------------------------------
 function validateLoginUsername(username) {
-	const usernameInput = document.getElementById("uname");
+	const usernameInput = document.getElementById("uid");
 
 	if (!username) {
-		usernameInput.classList.remove("error", "success");
-		return false;
-	}
-
-	// Check for malicious input
-	if (checkForMaliciousInput(username)) {
-		usernameInput.classList.add("error");
-		usernameInput.classList.remove("success");
+		if (usernameInput) usernameInput.classList.remove("error", "success");
 		return false;
 	}
 
 	// Check for maximum length
 	if (username.length > 254) {
-		usernameInput.classList.add("error");
-		usernameInput.classList.remove("success");
+		if (usernameInput) {
+			usernameInput.classList.add("error");
+			usernameInput.classList.remove("success");
+		}
 		return false;
 	}
 
@@ -213,8 +166,10 @@ function validateLoginUsername(username) {
 	const looksLikeEmail = username.includes("@");
 
 	if (looksLikeEmail && !emailRegex.test(username)) {
-		usernameInput.classList.add("error");
-		usernameInput.classList.remove("success");
+		if (usernameInput) {
+			usernameInput.classList.add("error");
+			usernameInput.classList.remove("success");
+		}
 		return false;
 	}
 
@@ -222,14 +177,18 @@ function validateLoginUsername(username) {
 	if (!looksLikeEmail) {
 		const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
 		if (!usernameRegex.test(username) || username.length < 3) {
-			usernameInput.classList.add("error");
-			usernameInput.classList.remove("success");
+			if (usernameInput) {
+				usernameInput.classList.add("error");
+				usernameInput.classList.remove("success");
+			}
 			return false;
 		}
 	}
 
-	usernameInput.classList.remove("error");
-	usernameInput.classList.add("success");
+	if (usernameInput) {
+		usernameInput.classList.remove("error");
+		usernameInput.classList.add("success");
+	}
 	return true;
 }
 
@@ -241,12 +200,6 @@ function validateLoginPassword(password) {
 		return false;
 	}
 
-	// Check for malicious input
-	if (checkForMaliciousInput(password)) {
-		passwordInput.classList.add("error");
-		passwordInput.classList.remove("success");
-		return false;
-	}
 
 	// Check for maximum length
 	if (password.length > 128) {
@@ -310,17 +263,18 @@ function togglePassword(fieldId) {
 // -------------------------------
 document.addEventListener("DOMContentLoaded", () => {
 	const uname = document.getElementById("uname");
+	const uid = document.getElementById("uid");
 	const email = document.getElementById("email");
 	const pass = document.getElementById("password");
 	const cpass = document.getElementById("cpassword");
 	const resetPasswordForm = document.getElementById("resetPasswordForm");
 
 	// Login field events (real-time validation)
-	if (uname && loginForm) {
-		uname.addEventListener("input", (e) =>
+	if (uid && loginForm) {
+		uid.addEventListener("input", (e) =>
 			validateLoginUsername(e.target.value.trim()),
 		);
-		uname.addEventListener("blur", (e) =>
+		uid.addEventListener("blur", (e) =>
 			validateLoginUsername(e.target.value.trim()),
 		);
 	}
@@ -403,26 +357,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	// Login submit (enhanced validation)
 	if (loginForm) {
 		loginForm.addEventListener("submit", (e) => {
-			let username = uname.value.trim();
+			let username = uid.value.trim();
 			let password = pass.value;
-
-			// Check for malicious input first (before sanitizing)
-			if (
-				checkForMaliciousInput(username) ||
-				checkForMaliciousInput(password)
-			) {
-				e.preventDefault();
-				showToast("Invalid characters detected in input", "error");
-				return;
-			}
-
-			// Sanitize inputs
-			username = sanitizeInput(username);
-			password = sanitizeInput(password);
-
-			// Update the form fields with sanitized values
-			uname.value = username;
-			pass.value = password;
 
 			// Use validation functions for consistency
 			const isUsernameValid = validateLoginUsername(username);

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chatapp</title>
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
-  <link rel="stylesheet" href="<?php echo base_url("assets/dashboardstyles.css") ?>">
+  <link rel="stylesheet" href="<?php echo base_url('assets/dashboardstyles.css') ?>">
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
@@ -69,10 +69,25 @@
             <p id="my-user-id">Connecting...</p>
           </div>
         </div>
-        <a href="<?= site_url('AuthController/Logout') ?>" class="logout-btn">
-          <i class="fas fa-sign-out-alt"></i>
-          Logout
-        </a>
+        <div class="logout-container">
+          <div class="logout-btn-group">
+            <a href="<?= site_url('AuthController/Logout') ?>" class="logout-btn-main">
+              <i class="fas fa-sign-out-alt"></i>
+              Logout
+            </a>
+            <button class="logout-btn-caret" id="logout-dropdown-btn">
+              <span class="fas fa-caret-down"></span>
+            </button>
+          </div>
+          <div class="logout-dropdown" id="logout-dropdown">
+            <a href="<?= site_url('AuthController/Logout') ?>">
+              <i class="fas fa-laptop"></i> Logout from this device
+            </a>
+            <a href="<?= site_url('AuthController/logoutAllDevices') ?>">
+              <i class="fas fa-globe"></i> Logout from all devices
+            </a>
+          </div>
+        </div>
       </div>
 
       <div class="search-create-container">

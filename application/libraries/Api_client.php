@@ -6,7 +6,7 @@ class Api_client
     protected $CI;
     protected $base_url;
     protected $max_retries = 3;
-    protected $retry_delay = 1000; // ms base delay for exponential backoff
+    protected $retry_delay = 1000;  // ms base delay for exponential backoff
     protected $timeout = 30;
 
     public function __construct()
@@ -23,7 +23,7 @@ class Api_client
     {
         return $this->post('/api/v1/register', [
             'username' => $username,
-            'email'    => $email,
+            'email' => $email,
             'password' => $password,
         ]);
     }
@@ -44,7 +44,7 @@ class Api_client
     public function resetPassword($token, $newPassword)
     {
         return $this->post('/api/reset-password', [
-            'token'       => $token,
+            'token' => $token,
             'newPassword' => $newPassword,
         ]);
     }
@@ -182,18 +182,31 @@ class Api_client
             'Accept: application/json',
         ];
 
-        // For server-side requests, we rely on the refresh token cookie
-        // The JWT is in localStorage (client-side only)
+        // Add Authorization header if we have an access token in the session
+        if ($this->CI->session->userdata('access_token')) {
+            $headers[] = 'Authorization: Bearer ' . $this->CI->session->userdata('access_token');
+        }
 
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $url,
+        // Forward the refresh token cookie to the backend
+        $this->CI->load->helper('cookie');
+        $refreshToken = get_cookie('refreshToken');
+        $cookieString = '';
+        if ($refreshToken) {
+            $cookieString = 'refreshToken=' . $refreshToken;
+        }
+
+        $curlOpts = [
+            CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_HTTPHEADER     => $headers,
-            // Shared cookie jar - refresh token cookie travels automatically
-            CURLOPT_COOKIEJAR      => APPPATH . 'cache/cookies.txt',
-            CURLOPT_COOKIEFILE     => APPPATH . 'cache/cookies.txt',
-        ]);
+            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_HTTPHEADER => $headers,
+        ];
+
+        if (!empty($cookieString)) {
+            $curlOpts[CURLOPT_COOKIE] = $cookieString;
+        }
+
+        curl_setopt_array($ch, $curlOpts);
 
         switch ($method) {
             case 'POST':
@@ -215,8 +228,8 @@ class Api_client
                 break;
         }
 
-        $response  = curl_exec($ch);
-        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         curl_close($ch);
 
@@ -247,7 +260,7 @@ class Api_client
     {
         return [
             'success' => false,
-            'error'   => ['message' => $message],
+            'error' => ['message' => $message],
         ];
     }
 }

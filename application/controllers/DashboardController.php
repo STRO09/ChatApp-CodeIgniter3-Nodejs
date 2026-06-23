@@ -36,10 +36,10 @@ class DashboardController extends CI_Controller
         $data['username'] = $username;
         $data['isBot'] = $isBot;
         $data['email'] = $email;
-        $data['access_token'] = $this->session->userdata('access_token');
+        // $data['access_token'] = $this->session->userdata('access_token');
 
-        // Clear the access token from session after passing to view
-        $this->session->unset_userdata('access_token');
+        // // Clear the access token from session after passing to view
+        // $this->session->unset_userdata('access_token');
 
         $this->load->view("Dashboard", $data);
     }
