@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
-import connectDB from './config/dbConnection.js';
-import Conversation from './models/Conversations.js';
-import { getUnreadCount, getBulkUnreadCounts } from './controllers/messageController.js';
+import connectDB from '../config/dbConnection.js';
+import Conversation from '../models/Conversations.js';
+import { getUnreadCount, getBulkUnreadCounts } from '../controllers/messageController.js';
 
 async function verifyPerformance() {
   await connectDB();

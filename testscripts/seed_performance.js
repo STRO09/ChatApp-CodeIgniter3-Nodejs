@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
-import User from './models/User.js';
-import Conversation from './models/Conversations.js';
-import Message from './models/Messages.js';
-import connectDB from './config/dbConnection.js';
+import User from '../models/User.js';
+import Conversation from '../models/Conversations.js';
+import Message from '../models/Messages.js';
+import connectDB from '../config/dbConnection.js';
 
 import bcrypt from 'bcryptjs';
 

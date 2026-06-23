@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
-import User from './models/User.js';
-import connectDB from './config/dbConnection.js';
+import User from '../models/User.js';
+import connectDB from '../config/dbConnection.js';
 
 async function checkBot() {
   await connectDB();

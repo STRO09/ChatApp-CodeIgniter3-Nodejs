@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import { io } from "../sockets/socket.js";
 import {
   generateTokenPair,
   verifyRefreshToken,
@@ -244,6 +245,10 @@ export const logoutAllDevices = asyncHandler(async (req, res) => {
 
   await invalidateAllUserTokens(userId);
   clearRefreshTokenCookie(res);
+
+  if (io) {
+    io.emit("forceLogout", { userId: userId.toString() });
+  }
 
   res.json(
     successResponse(null, "Logged out from all devices successfully")
