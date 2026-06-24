@@ -10,13 +10,11 @@ This project combines a traditional web application architecture with a dedicate
 
 Users can:
 
-- Message any online user instantly
-- Create conversations automatically when initiating a chat
-- Continue conversations through the conversation history sidebar
+- Message any online or offline user instantly
 - Participate in group chats
 - Exchange file attachments
 - Chat with an AI participant
-- Receive real-time message delivery and updates
+- Receive real-time message delivery updates
 - Track unread messages across conversations
 - Reset passwords through email verification
 - Manage account credentials
@@ -25,7 +23,7 @@ Users can:
 
 ## Repository Structure
 
-This repository uses a branch-based organization:
+This repository uses a branch-based separation:
 
 | Branch | Purpose |
 |----------|----------|
