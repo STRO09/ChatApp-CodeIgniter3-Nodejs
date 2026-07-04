@@ -21,15 +21,47 @@ Users can:
 
 ---
 
+## Demo & Screenshots
+
+### Demo Video
+
+https://drive.google.com/file/d/1sQjg0dQiOUqOJiXw2QjxaukDj2tmJx9K/view?usp=sharing
+
+### Screenshots
+
+<div align="center">
+  <img src="public/media/Screenshot%202026-06-30%20231136.png" width="45%" style="margin: 5px;" />
+  <img src="public/media/Screenshot%202026-06-30%20231221.png" width="45%" style="margin: 5px;" />
+  <img src="public/media/Screenshot%202026-06-30%20231647.png" width="45%" style="margin: 5px;" />
+  <img src="public/media/Screenshot%202026-06-30%20231702.png" width="45%" style="margin: 5px;" />
+  <img src="public/media/Screenshot%202026-06-30%20231822.png" width="45%" style="margin: 5px;" />
+</div>
+
+---
+
+## Architecture
+
+Request Flow:
+
+<img src="public/media/MainTechStack.png"><br>
+
+Auth Flow :
+
+<img src="public/media/AuthFlow.png"><br>
+
+Messaging Flow :
+
+<img src="public/media/messaging-diagram.png"><br>
+
 ## Repository Structure
 
 This repository uses a branch-based separation:
 
-| Branch | Purpose |
-|----------|----------|
-| `main` | Documentation and project overview |
-| `frontend` | Chat application CodeIgniter3 frontend |
-| `backend` | Node.js Socket.IO server, MongoDB and AI integration |
+| Branch     | Purpose                                              |
+| ---------- | ---------------------------------------------------- |
+| `main`     | Documentation and project overview                   |
+| `frontend` | Chat application CodeIgniter3 frontend               |
+| `backend`  | Node.js Socket.IO server, MongoDB and AI integration |
 
 > The `main` branch contains only project documentation. Application source code is maintained in the dedicated frontend and backend branches.
 
